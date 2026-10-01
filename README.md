@@ -16,8 +16,10 @@ You need an IntelMCP subscription: https://intelmcp.io
     /plugin marketplace add intelmcpops-creator/intelmcp-plugin
     /plugin install intelmcp@intelmcp
 
-The first time Claude uses IntelMCP, it asks you to sign in (Google or an
-emailed code). Use the email address you subscribed with.
+Then sign in once: run `/mcp`, choose **intelmcp**, then **Authenticate**, and
+sign in with Google or an emailed code. Use the email address you subscribed
+with. Install either this plugin or the `claude mcp add` command from the docs,
+not both.
 
 In claude.ai, add `https://mcp.intelmcp.io/mcp` as a custom connector instead;
 the setup interview and dashboard are available there as connector prompts.
