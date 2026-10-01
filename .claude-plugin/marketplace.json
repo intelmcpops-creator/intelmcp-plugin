@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "intelmcp",
+  "description": "The IntelMCP plugin for Claude Code and Cowork.",
+  "owner": {"name": "IntelMCP", "url": "https://intelmcp.io"},
+  "plugins": [
+    {
+      "name": "intelmcp",
+      "displayName": "IntelMCP",
+      "description": "Threat intelligence from public Telegram channels inside Claude, with a setup interview and a dashboard.",
+      "author": {"name": "IntelMCP", "url": "https://intelmcp.io"},
+      "category": "security",
+      "source": "./"
+    }
+  ]
+}
