@@ -11,7 +11,7 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
 
 1. Window: use the period the analyst asked for, capped at 30 days (the longest window every tool
    below supports); otherwise the last 7 days.
-2. If list_rules returns no rules, there is nothing to chart yet: say so and offer the setup interview
+2. If list_rules returns count 0 (no rules), there is nothing to chart yet: say so and offer the setup interview
    instead of drawing empty charts (in Claude Code: /intelmcp:setup; in claude.ai: the
    setup_monitoring prompt from the IntelMCP connector menu, or ask "Set up my IntelMCP monitoring").
 3. Gather the data with these tools only:
