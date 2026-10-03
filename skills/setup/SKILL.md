@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Set up IntelMCP monitoring: interview the analyst about what they need to watch, test alert rules against recent Telegram threat-intel history, and save the rules and watch profile once approved. Use on first use of IntelMCP or when the analyst wants to change what they monitor."
+description: "Set up or tune IntelMCP monitoring: interview the analyst about what they need to watch, test alert rules against recent Telegram threat-intel history, and save the rules and watch profile once approved; with monitoring already in place, adjust the existing rules instead. Use on first use of IntelMCP or when the analyst wants to change what they monitor."
 ---
 
 If the IntelMCP tools are not available, the analyst has not signed in yet: tell them to sign in

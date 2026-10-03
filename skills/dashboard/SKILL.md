@@ -1,6 +1,6 @@
 ---
 name: dashboard
-description: "Show the analyst's IntelMCP dashboard: a visual page of their matches over time, severities, trending indicators, rule performance, top sources and the latest high-severity matches. Use when they ask for a dashboard, an overview, a summary of their monitoring, or what is new."
+description: "Show the analyst's IntelMCP dashboard: a visual page of their matches over time, severities, trending indicators, rule performance, top sources and the latest high-severity matches. Use when they ask for a dashboard, an overview or a visual summary of their monitoring."
 ---
 
 If the IntelMCP tools are not available, the analyst has not signed in yet: tell them to sign in
