@@ -11,23 +11,26 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
 
 1. Window: use the period the analyst asked for, capped at 30 days (the longest window every tool
    below supports); otherwise the last 7 days.
-2. If list_rules returns count 0 (no rules), there is nothing to chart yet: say so and offer the setup interview
-   instead of drawing empty charts (in Claude Code: /intelmcp:setup; in claude.ai: the
-   setup_monitoring prompt from the IntelMCP connector menu, or ask "Set up my IntelMCP monitoring").
+2. If list_rules returns count 0 (no rules), there is nothing to chart yet: say so and offer the
+   setup interview instead of drawing empty charts ("Set up monitoring", setup_monitoring, in the
+   IntelMCP prompt menu in claude.ai; /intelmcp:setup in Claude Code).
 3. Gather the data with these tools only:
    - stats with group_by="severity", interval="day" and since_days set to the window: matches per day
      by severity (unjudged included);
    - stats with group_by "rule", "channel", "country" and "verdict" for the same window;
    - top_entities with scope="matches" for the types country, cve, domain and ip: counts and the
      change against the previous period;
-   - list_rules: hit counts and last hit time; flag rules that never fired;
+   - list_rules: each rule's hit_count and last hit time. hit_count includes the matches that the
+     7-day history produced when the rule was created, so a rule never fired only when its
+     hit_count is 0; stats with group_by="rule" gives its matches within the window;
    - list_matches: the latest high and critical matches, and how many are still unjudged. If nothing
-     has been judged yet, say so and suggest reviewing the matches first (the triage_matches prompt).
+     has been judged yet, say so and suggest reviewing the matches first ("Triage matches",
+     triage_matches, in the IntelMCP prompt menu in claude.ai; /intelmcp:triage in Claude Code).
 4. Lay out one page:
    - headline numbers: matches in the window, unreviewed, high plus critical, active rules;
    - a chart of matches per day stacked by severity;
    - a table of top indicators with their change against the previous period;
-   - a rules table: hits, last hit, and a "never fired" flag;
+   - a rules table: matches in the window, total hits, last hit, and a "never fired" flag;
    - the sources producing the most matches;
    - the latest high-severity matches: time, channel, a one-line summary and a link to the post.
    Make it self-contained HTML, CSS and JavaScript with the data inlined; load nothing from the network
