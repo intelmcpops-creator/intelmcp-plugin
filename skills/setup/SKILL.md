@@ -35,8 +35,10 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
      preview again, and in the summary say why they were narrowed.
    - If truncated is true, the scan stopped at its cap: the real volume is higher than hit_count
      shows. Narrow the rule, or for a regex add search_hint, and preview again.
-   - Thin coverage: if a chosen region's rules return few or no hits (check with days=30), say that
-     IntelMCP's coverage of that region is thin, and offer request_channel for channels they know there.
+   - Thin coverage: list_topics gives each topic's live_sources (sources that posted in the last 30
+     days). If the topics for a chosen region have few live sources, or its rules' previews return few
+     or no hits even with days=30, say plainly that IntelMCP's coverage of that region is thin, and offer
+     request_channel for public channels they know there.
 5. Write a short watch profile from the answers: a brief, what qualifies (criteria), and a severity
    guide where critical is what they described as most important.
 6. Show one compact summary: each rule in plain words with its expected alerts per day, the total per
