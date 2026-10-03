@@ -33,6 +33,8 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
      Above about 50 a day the analyst cannot review them all: narrow the biggest rules first (scope a
      country rule with threat topics, combine it with terms, or replace it with the named groups),
      preview again, and in the summary say why they were narrowed.
+   - If truncated is true, the scan stopped at its cap: the real volume is higher than hit_count
+     shows. Narrow the rule, or for a regex add search_hint, and preview again.
    - Thin coverage: if a chosen region's rules return few or no hits (check with days=30), say that
      IntelMCP's coverage of that region is thin, and offer request_channel for channels they know there.
 5. Write a short watch profile from the answers: a brief, what qualifies (criteria), and a severity
@@ -43,7 +45,9 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
 7. On yes: add_rule for each rule with backfill_days=7, then save_watch_profile with the name
    "default". Then show the first results:
    - how many matches the last 7 days produced for each rule (backfilled in each add_rule result);
-   - list_matches with limit=5, and the newest 3-5 matches: a one-line title, channel, date and link;
+   - list_matches with rule_id and limit=3 for each new rule; merge the entries sorted by posted date,
+     newest first (the message's posted_at), and show the newest 3-5: a one-line title, channel, date
+     and link;
    - offer to judge them now against the profile. On yes, follow the triage steps below.
    On no: ask what to change, adjust, and show the summary again.
 8. Close in two or three lines: matches wait in IntelMCP until they ask (set_delivery can push them to
@@ -56,6 +60,8 @@ a. Show what exists: each rule in plain words with its hit_count (matches so far
    of history found when it was created), last hit and whether it is on; and the profile's brief and
    criteria. stats with group_by="rule" and group_by="verdict" for the last 7 days show which rules
    produce matches judged irrelevant.
+a2. If there is no watch profile, write one as in step 5 from the existing rules and the analyst's
+   answer, and save it with save_watch_profile under the name 'default'.
 b. Ask one question: what should change (less noise, more of something, a new topic, a new focus)?
 c. Propose changes to what exists, with preview_rule on every new or changed pattern: update_rule to
    narrow or widen a rule, set_rule_enabled to pause one, delete_rule to remove one, add_rule only
@@ -77,9 +83,9 @@ T3. Save the whole page with one record_verdict call, using items: one {match_id
     summary, reason} per match. Relevant: a severity from the severity guide, a one-line summary and
     the criterion as the reason. Irrelevant: a short reason.
 T4. Continue with list_matches, verdict="unreviewed" and cursor set to next_cursor, until next_cursor
-    is null. Only unreviewed matches are judged: never change a match that already has a verdict (the
-    analyst's or an earlier triage). After about 200 matches, stop, say how many remain unreviewed,
-    and offer to continue.
+    is null. Only unreviewed entries are judged: never re-judge an entry that already has a verdict (a
+    verdict on an entry also applies to its reposts). After about 200 matches, stop, say how many
+    remain unreviewed, and offer to continue.
 T5. End with a short summary: how many matches were judged; the relevant ones by severity (critical,
     high, medium, low); the top items, highest severity first, each with its one-line summary,
     channel, date and link; how many were irrelevant and the usual reason. If one rule produced

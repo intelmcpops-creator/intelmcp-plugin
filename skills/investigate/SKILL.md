@@ -11,14 +11,15 @@ Investigate the analyst's question with the IntelMCP tools. The question is the 
 request; if there is none, ask for it.
 
 1. search_messages with the key names and terms, in every language the actors use (Arabic, Farsi,
-   Russian, Hebrew, English). Try spelling variants and transliterations. Searches, find_entity and
-   timeline share a per-minute limit: prefer a few well-chosen queries; when the limit is reached, the
-   message says when the next one is possible.
+   Russian, Hebrew, English). Try spelling variants and transliterations. Searches, find_entity,
+   timeline, preview_rule and top_entities share a per-minute limit: prefer a few well-chosen
+   queries; when the limit is reached, the message says when the next one is possible.
 2. For promising hits: get_message (the full text), get_context (what surrounds it), trace_forwards
    (original or recycled?).
 3. Pivot on indicators with find_entity: IPs, domains, URLs, hashes, CVEs, and countries as ISO codes.
    find_entity matches the exact value; an organization's domain also appears in subdomains and in
-   email addresses, which search_messages finds. timeline shows activity over time.
+   email addresses, which search_messages finds in its default hybrid mode. timeline shows activity
+   over time.
 4. Separate what a message claims from what it demonstrates. A screenshot claim is not proof of access.
 5. Cite every factual point with its message_ref and link. Say what you could not find: the
    collection holds the channels IntelMCP collects, so an absence there is not proof of absence.

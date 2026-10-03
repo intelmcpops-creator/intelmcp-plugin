@@ -23,9 +23,10 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
    - list_rules: each rule's hit_count and last hit time. hit_count includes the matches that the
      7-day history produced when the rule was created, so a rule never fired only when its
      hit_count is 0; stats with group_by="rule" gives its matches within the window;
-   - list_matches: the latest high and critical matches, and how many are still unjudged. If nothing
-     has been judged yet, say so and suggest reviewing the matches first ("Triage matches",
-     triage_matches, in the IntelMCP prompt menu in claude.ai; /intelmcp:triage in Claude Code).
+   - list_matches with min_severity="high": the latest high and critical matches. Count the
+     unjudged from stats with group_by="verdict" (its "unreviewed" rows). If nothing has been
+     judged yet, say so and suggest reviewing the matches first ("Triage matches", triage_matches,
+     in the IntelMCP prompt menu in claude.ai; /intelmcp:triage in Claude Code).
 4. Lay out one page:
    - headline numbers: matches in the window, unreviewed, high plus critical, active rules;
    - a chart of matches per day stacked by severity;

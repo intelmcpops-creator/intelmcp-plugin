@@ -30,9 +30,9 @@ T3. Save the whole page with one record_verdict call, using items: one {match_id
     summary, reason} per match. Relevant: a severity from the severity guide, a one-line summary and
     the criterion as the reason. Irrelevant: a short reason.
 T4. Continue with list_matches, verdict="unreviewed" and cursor set to next_cursor, until next_cursor
-    is null. Only unreviewed matches are judged: never change a match that already has a verdict (the
-    analyst's or an earlier triage). After about 200 matches, stop, say how many remain unreviewed,
-    and offer to continue.
+    is null. Only unreviewed entries are judged: never re-judge an entry that already has a verdict (a
+    verdict on an entry also applies to its reposts). After about 200 matches, stop, say how many
+    remain unreviewed, and offer to continue.
 T5. End with a short summary: how many matches were judged; the relevant ones by severity (critical,
     high, medium, low); the top items, highest severity first, each with its one-line summary,
     channel, date and link; how many were irrelevant and the usual reason. If one rule produced
