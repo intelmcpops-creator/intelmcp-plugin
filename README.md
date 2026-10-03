@@ -25,6 +25,6 @@ In claude.ai, add `https://mcp.intelmcp.io/mcp` as a custom connector instead;
 the setup interview and dashboard are available there as connector prompts.
 
 Docs: https://intelmcp.io/docs/ · Privacy: https://intelmcp.io/privacy/ ·
-Terms: https://intelmcp.io/terms/ · Contact: intelmcp.ops@gmail.com
+Terms: https://intelmcp.io/terms/ · Contact: support@intelmcp.io
 
 IntelMCP is not affiliated with or endorsed by Telegram.
