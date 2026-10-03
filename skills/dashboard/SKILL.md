@@ -15,6 +15,8 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
    setup interview instead of drawing empty charts ("Set up monitoring", setup_monitoring, in the
    IntelMCP prompt menu in claude.ai; /intelmcp:setup in Claude Code).
 3. Gather the data with these tools only:
+   - show_dashboard returns everything below in one call (and opens IntelMCP's interactive panel in
+     clients that support MCP Apps; then describe what needs attention under it instead of drawing a page);
    - stats with group_by="severity", interval="day" and since_days set to the window: matches per day
      by severity (unjudged included);
    - stats with group_by "rule", "channel", "country" and "verdict" for the same window;
