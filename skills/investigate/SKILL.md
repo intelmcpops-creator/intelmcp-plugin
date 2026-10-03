@@ -17,8 +17,9 @@ request; if there is none, ask for it.
 2. For promising hits: get_message (the full text), get_context (what surrounds it), trace_forwards
    (original or recycled?).
 3. Pivot on indicators with find_entity: IPs, domains, URLs, hashes, CVEs, and countries as ISO codes.
-   find_entity matches the exact value; an organization's domain also appears in subdomains and in
-   email addresses, which search_messages finds in its default hybrid mode. timeline shows activity
+   find_entity matches the value, and a domain also covers its subdomains and email addresses at it;
+   other spellings and partial names are other values, which search_messages finds in its default
+   hybrid mode. timeline shows activity
    over time.
 4. Separate what a message claims from what it demonstrates. A screenshot claim is not proof of access.
 5. Cite every factual point with its message_ref and link. Say what you could not find: the

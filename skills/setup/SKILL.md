@@ -20,15 +20,20 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
    for countries (country:<two-letter code>), CVEs and other indicators; 'word' for whole words,
    including names in the scripts used in their regions; RE2 'regex' for variants and spellings.
    Watch short tokens: a 2-5 letter name matches inside other words, so use 'word' or word boundaries.
-   - The organization's own domains: a 'word' rule on the domain (example.com), which also catches
-     subdomains (vpn.example.com) and email addresses (name@example.com) in leaks; an 'entity' domain
-     rule matches the exact domain only.
+   - The organization's own domains: a 'word' rule on the domain (example.com) or an 'entity' rule
+     (domain:example.com); both catch subdomains (vpn.example.com) and email addresses
+     (name@example.com) in leaks, and the entity rule also catches defanged forms (example[.]com).
+   - A name that is also a common word: write the word rule as '=word' (=حماس). Arabic and Hebrew
+     words otherwise match with attached prefixes, including the article (الحماس, enthusiasm);
+     '=word' keeps و، ف، ب، ل but not the article.
    - Broad answers ("everything about Iran"): draft focused rules, not a bare country rule: the
      country scoped with threat topic tags from list_topics, or the country's names combined with
      threat terms in a regex, plus rules for the threat groups they named.
    - If they mention industrial systems (SCADA, PLCs, an ICS vendor), add a rule for those terms.
 4. Run preview_rule on every draft (for a regex, pass search_hint). Drop or tighten a rule whose sample
-   hits are mostly noise, and loosen one that catches nothing.
+   hits are mostly noise, and loosen one that catches nothing. matched_forms lists the spellings and
+   prefixed forms a rule caught, with counts: a form that is another word calls for '=word' or a
+   tighter pattern.
    - Volume budget: add up alerts_per_day across the rules. Aim for roughly 10-30 a day in total.
      Above about 50 a day the analyst cannot review them all: narrow the biggest rules first (scope a
      country rule with threat topics, combine it with terms, or replace it with the named groups),
