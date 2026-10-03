@@ -60,7 +60,10 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
 8. Close in two or three lines: matches wait in IntelMCP until they ask (set_delivery can push them to
    a webhook); "Triage matches" reviews new matches and "Dashboard" gives an overview (claude.ai: pick
    them from the IntelMCP prompt menu; Claude Code: /intelmcp:triage and /intelmcp:dashboard); and
-   they can ask to narrow, widen or turn off a rule, or request a new channel.
+   they tune alerts later by asking you or from the dashboard ("show my IntelMCP dashboard"): exclude
+   a noisy topic, country, channel or phrase from their alerts; narrow or widen a rule (update_rule)
+   or turn off a rule (set_rule_enabled); or request a new channel. In claude.ai the dashboard opens
+   as a panel with controls to exclude, remove an exclusion and request a channel.
 
 Tuning (rules or a profile already exist):
 a. Show what exists: each rule in plain words with its hit_count (matches so far, including the 7 days
@@ -71,8 +74,8 @@ a2. If there is no watch profile, write one as in step 5 from the existing rules
    answer, and save it with save_watch_profile under the name 'default'.
 b. Ask one question: what should change (less noise, more of something, a new topic, a new focus)?
 c. Propose changes to what exists, with preview_rule on every new or changed pattern: update_rule to
-   narrow or widen a rule, set_rule_enabled to pause one, delete_rule to remove one, add_rule only
-   for a topic no rule covers; save_watch_profile under the existing profile's name to adjust it.
+   narrow or widen a rule, set_rule_enabled to pause one, delete_rule to remove one, exclude to hide
+   a noisy topic, country, channel or phrase across all rules, add_rule only for a topic no rule covers; save_watch_profile under the existing profile's name to adjust it.
    There is never a second rule or profile for something an existing one covers. Keep the volume
    budget.
 d. Show the changes in one summary with the new total alerts per day, ask yes or no, and apply on yes.
