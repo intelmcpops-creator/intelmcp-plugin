@@ -16,10 +16,13 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
    IntelMCP prompt menu in claude.ai; /intelmcp:setup in Claude Code).
 3. Call show_dashboard with days=7, or days=30 for a longer window. It covers 7 or 30 days only:
    headline numbers (alerts, unreviewed, high plus critical, active rules), alerts per day by
-   severity, the 20 latest alerts with their channel, topics and countries, and the analyst's
-   exclusions. Repeats and excluded alerts are not counted. In clients that support MCP Apps
-   (claude.ai) it opens IntelMCP's interactive panel: then the panel is the page, so do not draw
-   one; skip steps 4 to 6 and write the notes of step 7 under it, gathering what they need (rules,
+   severity, what needs attention (unreviewed alerts, failing deliveries, rules that never fired or
+   fire too often, answered channel requests, a subscription ending), the 10 most severe alerts with
+   their channel, topics and countries, and how many exclusions are in place. Repeats and excluded
+   alerts are not counted. In clients that support MCP Apps (claude.ai) it opens IntelMCP's
+   interactive panel, where the analyst can also triage, manage rules, exclusions and deliveries,
+   check sources, search and see the account: then the panel is the page, so do not draw one; skip
+   steps 4 to 6 and write the notes of step 7 under it, gathering what they need (rules,
    indicators) with the tools below.
    Otherwise gather the rest with these tools only:
    - stats with group_by="severity", interval="day" and since_days set to the window, when the
@@ -33,14 +36,19 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
    - list_matches with min_severity="high": the latest high and critical matches. Count the
      unjudged from stats with group_by="verdict" (its "unreviewed" rows). If nothing has been
      judged yet, say so and suggest reviewing the matches first ("Triage matches", triage_matches,
-     in the IntelMCP prompt menu in claude.ai; /intelmcp:triage in Claude Code).
+     in the IntelMCP prompt menu in claude.ai; /intelmcp:triage in Claude Code);
+   - list_deliveries: each webhook's status, last result and anything waiting;
+   - account_status: the plan and today's usage against its limits.
 4. Lay out one page from show_dashboard and these tools:
    - headline numbers: matches in the window, unreviewed, high plus critical, active rules;
    - a chart of matches per day stacked by severity;
    - a table of top indicators with their change against the previous period;
    - a rules table: matches in the window, total hits, last hit, and a "never fired" flag;
    - the sources producing the most matches;
-   - the latest high-severity matches: time, channel, a one-line summary and a link to the post.
+   - the latest high-severity matches: time, channel, a one-line summary and a link to the post;
+   - deliveries (status and last result) and one account line (plan and usage).
+   The page only reads; under it, say that the analyst can ask you to change rules, exclusions or
+   deliveries.
    Make it self-contained HTML, CSS and JavaScript with the data inlined; load nothing from the network
    except a charting library from cdnjs.cloudflare.com if you need one. It must read well in light and
    dark mode and on a phone.
