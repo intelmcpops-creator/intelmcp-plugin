@@ -2,7 +2,7 @@
 
 IntelMCP gives security analysts searchable, monitored threat intelligence from
 public Telegram channels, inside Claude. This plugin adds the IntelMCP connector
-and four commands:
+and five commands:
 
 - **Set up monitoring**, `/intelmcp:setup`: Claude asks what you need to watch,
   tests alert rules against recent history, saves your setup once you approve it
@@ -13,6 +13,10 @@ and four commands:
   against your watch profile and tells you what's new and what matters, with links.
 - **Investigate**, `/intelmcp:investigate <question>`: research a threat actor,
   campaign, leak or indicator across the collection, with every point cited.
+- **Command centre**, `/intelmcp:command-centre`: creates your own live IntelMCP
+  dashboard as a private page in your Claude account (Artifacts), where you triage
+  alerts and manage rules, exclusions and deliveries. It needs IntelMCP connected
+  in claude.ai too. More: https://intelmcp.io/command-centre/
 
 ## Install
 

@@ -1,0 +1,32 @@
+{
+  "mcp": {
+    "servers": [
+      {
+        "server": "IntelMCP",
+        "tools": [
+          "ack_matches",
+          "add_rule",
+          "check_source",
+          "delete_delivery",
+          "delete_rule",
+          "exclude",
+          "get_context",
+          "get_message",
+          "preview_rule",
+          "record_verdict",
+          "remove_exclusion",
+          "request_channel",
+          "rotate_delivery_secret",
+          "save_watch_profile",
+          "search_messages",
+          "set_delivery",
+          "set_rule_enabled",
+          "show_dashboard",
+          "test_delivery",
+          "trace_forwards",
+          "update_rule"
+        ]
+      }
+    ]
+  }
+}
