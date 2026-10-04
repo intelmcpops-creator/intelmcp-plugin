@@ -29,7 +29,9 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
      window is neither 7 nor 30 days: matches per day by severity (unjudged included);
    - stats with group_by "rule", "channel", "country" and "verdict" for the same window;
    - top_entities with scope="matches" for the types country, cve, domain and ip: counts and the
-     change against the previous period;
+     change against the previous period. A domain or URL with a role is a service host (an
+     uptime checker or defacement mirror, an archive, a lookup or paste site, a file share, a
+     social network, a shortener or a .onion site): where posts point, not victims;
    - list_rules: each rule's hit_count and last hit time. hit_count includes the matches that the
      7-day history produced when the rule was created, so a rule never fired only when its
      hit_count is 0; stats with group_by="rule" gives its matches within the window;
@@ -42,7 +44,8 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
 4. Lay out one page from show_dashboard and these tools:
    - headline numbers: matches in the window, unreviewed, high plus critical, active rules;
    - a chart of matches per day stacked by severity;
-   - a table of top indicators with their change against the previous period;
+   - a table of top indicators with their change against the previous period; leave out values
+     that have a role, and do not count them as victim domains;
    - a rules table: matches in the window, total hits, last hit, and a "never fired" flag;
    - the sources producing the most matches;
    - the latest high-severity matches: time, channel, a one-line summary and a link to the post;
