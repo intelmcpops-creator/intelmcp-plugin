@@ -117,6 +117,7 @@ button.day:hover { background: var(--surface-2); }
 .sev.low { color: var(--low); } .sev.unjudged { color: var(--unjudged); } .sev.irrelevant { color: var(--irrelevant); }
 .badge { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 11px; font-weight: 600; background: var(--surface-2); color: var(--muted); }
 .badge.warn, .health.failing { color: var(--danger); } .health.ok { color: var(--ok); } .health.paused { color: var(--muted); }
+.qf select { max-width: 100%; }
 .qf { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 .qf button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .keys-hint { font-size: 12px; color: var(--muted); margin: 4px 0 8px; }
@@ -142,7 +143,7 @@ mark { background: var(--accent-soft); color: var(--fg); border-radius: 3px; pad
 .cardfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
 .cardfoot .actions { margin: 0 0 0 auto; }
 .facts { display: flex; flex-wrap: wrap; gap: 4px 6px; }
-.facts .chip { padding: 0 8px; font-size: 12px; border-radius: 999px; color: var(--muted); }
+.facts .chip { padding: 0 8px; font-size: 12px; border-radius: 999px; color: var(--muted); max-width: 100%; overflow-wrap: anywhere; }
 .facts .chip.victim { color: var(--fg); border-color: var(--accent); font-family: var(--mono); font-weight: 600; }
 .facts .chip.target { font-family: var(--mono); }
 .facts .chip.svc { border-style: dashed; }
@@ -219,6 +220,7 @@ fieldset .row { display: inline-flex; gap: 6px; }
 .welcome { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--accent); background: var(--accent-soft);
   border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
 .welcome p { margin: 0; flex: 1; max-width: 70em; }
+.welcome[hidden] { display: none; }
 
 </style>
 <div id="app">
@@ -405,10 +407,11 @@ function textBlock(tag, text, cls, lang) {
 // A line of only spaces or invisible marks (direction marks, zero-width spaces) counts as blank.
 const BLANKISH = "[\\s\\u200b-\\u200f\\u2066-\\u2069\\ufeff]";
 const BLANK_RUN = new RegExp("[ \\t]*\\n" + BLANKISH + "*\\n" + BLANKISH + "*", "g");
-function foldBlank(t) { return str(t).replace(BLANK_RUN, "\n").trim().replace(/^…\s*\n/, "…"); }
+const BLANK_EDGES = new RegExp("^" + BLANKISH + "+|" + BLANKISH + "+$", "g");
+function foldBlank(t) { return str(t).replace(BLANK_RUN, "\n").replace(BLANK_EDGES, "").replace(/^…\s*\n/, "…"); }
 // A post's direction by the letters it is mostly written in (links ignored), not by its first
 // letter: an Arabic post signed in English still aligns right. Each paragraph orders itself.
-const RTL_LETTERS = /[֐-ࣿיִ-﷿ﹰ-﻿]/g, LTR_LETTERS = /[A-Za-zÀ-ɏͰ-ϿЀ-ӿ]/g;
+const RTL_LETTERS = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefc]/g, LTR_LETTERS = /[A-Za-z\u00c0-\u024f\u0370-\u03ff\u0400-\u04ff]/g;
 function dominantDir(t) {
   const s = str(t).replace(/https?:\/\/\S+/g, "");
   return (s.match(RTL_LETTERS) || []).length > (s.match(LTR_LETTERS) || []).length ? "rtl" : "ltr";
@@ -430,17 +433,21 @@ function cardText(a) {
   if (at < 0 && a.excerpt) return foldBlank(a.excerpt);     // the match is past the text sent
   if (text.length <= POST_IN_CARD) return text;
   if (at < 0) at = 0;
-  // A match in the closing hashtags or signature: the claim at the head, then the matched line.
+  // A match in a line of hashtags or links (a signature): the claim at the head, then the matched line.
   const lineStart = text.lastIndexOf("\n", at) + 1, lineEnd = text.indexOf("\n", at);
   const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd);
   const words = line.replace(/https?:\/\/\S+|#\S+/g, "").replace(/[^\p{L}]/gu, "").length;
-  if (at > text.length * 0.75 || words < 15) {
+  if (words < 15) {
     const cut = text.lastIndexOf(" ", 300);
     return text.slice(0, cut > 0 ? cut : 300).trim() + " … " + str(line.trim(), 120);
   }
   if (at < CARD_SNIPPET / 2) { const end = text.lastIndexOf(" ", CARD_SNIPPET); return text.slice(0, end > 0 ? end : CARD_SNIPPET) + " …"; }
   let start = text.lastIndexOf("\n", at) + 1;
-  if (at - start > 200) { const dot = text.lastIndexOf(". ", at - 40); start = dot > start && at - dot < 220 ? dot + 2 : text.indexOf(" ", at - 160) + 1; }
+  if (at - start > 200) {
+    const dot = text.lastIndexOf(". ", at - 40), sp = text.indexOf(" ", at - 160);
+    // A sentence start, else a word start before the term; text without spaces (CJK, a long link) is cut by length.
+    start = dot > start && at - dot < 220 ? dot + 2 : (sp >= 0 && sp < at ? sp + 1 : Math.max(0, at - 160));
+  }
   let end = Math.min(text.length, start + CARD_SNIPPET);
   if (end < text.length) { const sp = text.lastIndexOf(" ", end); end = sp > at + term.length ? sp : end; }
   return (start > 0 ? "… " : "") + text.slice(start, end).trim() + (end < text.length ? " …" : "");
@@ -617,7 +624,7 @@ function showWaiting(id, secret) {
     p.reject(new PanelError("stopped", "Stopped waiting. Refresh to see whether the change was made.")); } });
   stop.id = "stopWaiting"; $("status").append(" ", stop);
 }
-function hideWaiting() { const s = $("stopWaiting"); if (s) s.remove(); }
+function hideWaiting() { const s = $("stopWaiting"); if (s) s.remove(); if ($("status").textContent.startsWith("Waiting for Claude")) status(""); }
 function compact(o) { const out = {}; Object.entries(o).forEach(([k, v]) => {
   if (v !== undefined && v !== null && v !== "" && v !== false && !(Array.isArray(v) && !v.length)) out[k] = v; }); return out; }
 
@@ -646,9 +653,10 @@ function viewArgs(view) {
       min_severity: f.min_severity || undefined, rule_id: f.rule_id ? Number(f.rule_id) : undefined,
       unacked_only: f.unacked_only || undefined, include_excluded: f.include_excluded || undefined,
       channel_id: f.channel_id ? Number(f.channel_id) : undefined, topic: f.topic || undefined,
-      since: f.since || undefined, until: f.until || undefined, cursor: state.cursor || undefined});
+      since: f.since || undefined, until: f.until || undefined, cursor: state.cursor || undefined, post_text: true});
   }
-  return {days: state.days, view: view};
+  // The panel shows the post in each alert card; a call without post_text carries only excerpts.
+  return view === "overview" ? {days: state.days, view: view, post_text: true} : {days: state.days, view: view};
 }
 async function load(view, force) {
   if (view === "search") return null;
@@ -734,7 +742,16 @@ function updateTabCounts() {
     set("delivery", num(att.failing_deliveries), true, plural(att.failing_deliveries, "delivery failing or paused", "deliveries failing or paused"));
   }
 }
+// A new webhook secret is shown once: leaving it (another tab, Refresh) asks once more first.
+function leavingSecret() {
+  if (!state.secret) return false;
+  if (state.secretWarned) { state.secret = null; state.secretWarned = false; return false; }
+  state.secretWarned = true;
+  status("The new secret is shown only here, once: copy it, then press \u201cDone, I've stored it\u201d. Choose again to leave without it.");
+  return true;
+}
 function selectTab(view, focusPanel) {
+  if (state.tab !== view && leavingSecret()) { $("tab-" + state.tab).focus(); return; }
   if (state.tab !== view) { state.secret = null; state.expanded = null; }
   state.tab = view;
   TABS.forEach(([key]) => { const t = $("tab-" + key); const on = key === view;
@@ -908,6 +925,7 @@ function alertCard(a, opts) {
   if (a.incident_via === "same") head.append(el("span", "also matched by another rule", "badge"));
   else if (a.incident_role === "update") head.append(el("span", "update", "badge"));
   if (a.forward_of) head.append(textBlock("span", "forwarded from " + str(a.forward_of, 80), "badge"));
+  if (a.claim) { const c = el("span", "claim", "badge"); c.title = "The channel names itself: its own claim"; head.append(c); }
   if (a.acked) head.append(el("span", "acknowledged"));
   if (a.excluded) head.append(el("span", "hidden by exclusions"));
   box.append(head);
@@ -925,7 +943,8 @@ function alertCard(a, opts) {
   tog.setAttribute("aria-expanded", grown ? "true" : "false");
   tog.setAttribute("aria-controls", "more-" + str(a.match_id));
   actions.append(sevChips(a.match_id), button("Irrelevant", () => stageAndRefresh(a.match_id, {verdict: "irrelevant"})),
-    button("Ack", () => { stageAck(a.match_id); refreshCard(a.match_id); }, {label: "Acknowledge"}), tog, link(a.link, "Telegram ↗"));
+    button("Ack", () => { stageAck(a.match_id); refreshCard(a.match_id); }, {label: "Acknowledge"}), tog);
+  const tg = link(a.link, "Telegram ↗"); if (tg.tagName === "A") actions.append(tg);
   if (staged) { actions.append(el("span", staged, "staged"),
     button("Undo", () => { state.verdicts.delete(a.match_id); state.acks.delete(a.match_id); renderTray(); refreshCard(a.match_id); }, {label: "Undo the staged change"})); }
   if (grown) box.append(actions);
@@ -1248,7 +1267,10 @@ function renderAlerts(panel, d) {
     || (items.find(a => str(a.rule_id) === str(f.rule_id)) || {}).rule_name || f.rule_id, 60));
   if (f.since || f.until) active.push(f.since === f.until ? "on " + f.since : "from " + (f.since || "start") + (f.until ? " to " + f.until : ""));
   if (f.verdict) active.push(f.verdict); if (f.min_severity) active.push(f.min_severity + " or higher");
-  const summary = el("p", plural(d.total, "alert") + (d.total_capped ? "+" : "") + (active.length ? " · " + active.join(" · ") : ""), "meta");
+  // Later pages carry no total: the first page's stays.
+  if (!state.cursor) state.alertsTotal = {total: d.total, capped: d.total_capped};
+  const totals = state.alertsTotal || {total: d.total, capped: d.total_capped};
+  const summary = el("p", plural(totals.total, "alert") + (totals.capped ? "+" : "") + (active.length ? " · " + active.join(" · ") : ""), "meta");
   if (active.length) summary.append(" ", button("Clear filters", () => openAlerts({}), {cls: "link"}));
   panel.append(summary);
   const queue = el("div", undefined, "queue");
@@ -1271,8 +1293,8 @@ function renderAlerts(panel, d) {
     items.forEach(a => queue.append(alertCard(a, {list: items, select: true})));
   }
   const pager = el("div", undefined, "row");
-  if (state.cursors.length) pager.append(button("Newer", async () => { state.cursor = state.cursors.pop() || null; delete state.cache.alerts; await show("alerts", false); }));
-  if (d.next_cursor) pager.append(button("Older", async () => { state.cursors.push(state.cursor); state.cursor = str(d.next_cursor); delete state.cache.alerts; await show("alerts", false); }));
+  if (state.cursors.length) pager.append(button("Newer", async () => { state.cursor = state.cursors.pop() || null; state.selection.clear(); delete state.cache.alerts; await show("alerts", false); }));
+  if (d.next_cursor) pager.append(button("Older", async () => { state.cursors.push(state.cursor); state.cursor = str(d.next_cursor); state.selection.clear(); delete state.cache.alerts; await show("alerts", false); }));
   queue.append(pager);
   panel.append(queue);
 }
@@ -1312,6 +1334,7 @@ function indicatorRow(e, watchable) {
 async function copyText(text, near) {
   try { await navigator.clipboard.writeText(text); status("Copied (defanged)."); return; }
   catch (e) {
+    near.querySelectorAll("input.secret").forEach(f => f.remove());
     const field = input("text", text); field.readOnly = true; field.className = "secret"; field.setAttribute("aria-label", "Copy this text");
     near.append(field); field.select(); status("Select and copy it by hand: the clipboard is not available here.");
   }
@@ -1344,7 +1367,9 @@ function traceView(t) {
   else if (origin) box.append(el("p", "The original channel is not in the collection; Sources can check or request a channel by its @username.", "meta"));
   const spread = arr(t.forwards).concat(arr(t.copies_without_forward_header));
   if (spread.length) { box.append(el("h3", "Spread by " + plural(spread.length, "channel"))); const ul = el("ul");
-    spread.forEach(s => { const li = el("li"); li.append(document.createTextNode(str((s.channel && s.channel.title) || s.channel, 120) + " "), timeEl(s.posted_at), document.createTextNode(" "), link(s.link, "open post")); ul.append(li); });
+    spread.forEach(s => { const li = el("li"); const ch = s.channel && typeof s.channel === "object"
+      ? (s.channel.title || (s.channel.username ? "@" + s.channel.username : "a channel")) : (s.channel || "a channel");
+      li.append(document.createTextNode(str(ch, 120) + " "), timeEl(s.posted_at), document.createTextNode(" "), link(s.link, "open post")); ul.append(li); });
     box.append(ul); }
   if (!box.children.length) box.append(el("p", "No forwards or copies found.", "meta"));
   return box;
@@ -1429,8 +1454,10 @@ function ruleForm(d, edit, prefill, prefix) {
     catch (err) { out.replaceChildren(el("p", str(err.message, 300), "error")); } resize(); }, {cls: "preview"});
   actions.append(preview);
   if (edit) actions.append(button("Save", async () => {
-      await write("update_rule", compact({rule_id: edit.rule_id, name: name.value.trim(), match_type: type.value, pattern: pattern.value,
-        case_sensitive: cs.checked, tags: picked(), clear_scope: clear.checked || undefined}));
+      // Case-sensitive is always sent (off is a change too); unticking every topic removes the scope.
+      const tagsNow = picked(), dropScope = clear.checked || (!tagsNow.length && arr(edit.tags).length > 0);
+      await write("update_rule", Object.assign(compact({rule_id: edit.rule_id, name: name.value.trim(), match_type: type.value,
+        pattern: pattern.value, tags: dropScope ? undefined : tagsNow, clear_scope: dropScope || undefined}), {case_sensitive: cs.checked}));
       state.rulesForm = null; status("Rule saved."); await show("rules", false); }, {write: true, cls: "primary"}));
   else actions.append(button("Create", async () => {
       const r = await write("add_rule", compact({name: name.value.trim(), match_type: type.value, pattern: pattern.value,
@@ -1557,7 +1584,9 @@ function renderDelivery(panel, d) {
     // Without Monitor a destination can be paused or deleted, nothing else.
     if (monitor || x.enabled) row.append(button(x.enabled ? "Pause" : "Resume", async () => {
         await write("set_delivery", {delivery_id: x.delivery_id, enabled: !x.enabled}); status(x.enabled ? "Paused." : "Resumed."); await show("delivery", false); }, {write: true}));
-    if (monitor) row.append(button("Send test", async () => { result.textContent = "Testing…"; const t = await write("test_delivery", {delivery_id: x.delivery_id});
+    if (monitor) row.append(button("Send test", async () => { result.textContent = "Testing…"; let t;
+        try { t = await write("test_delivery", {delivery_id: x.delivery_id}); }
+        catch (err) { result.textContent = "Test not sent: " + str(err && err.message, 200); return; }
         result.textContent = t.ok ? "Test answered " + num(t.status) + "." : "Test failed" + (t.status ? " (HTTP " + num(t.status) + ")" : ": no answer") + "."; }, {write: true}),
       twoStep("Rotate secret", "Rotate? The receiver stops verifying until it has the new secret.", async () => {
         const r = await write("rotate_delivery_secret", {delivery_id: x.delivery_id}, {secret: true,
@@ -1608,7 +1637,7 @@ function secretBox() {
   const copy = (value, field, what) => async () => { try { await navigator.clipboard.writeText(value); status("Copied the " + what + "."); } catch (e) { field.select(); status("Select and copy it by hand."); } };
   if (canCopy) box.append(button("Copy X-TI-Signature secret", copy(s.secret, f1, "X-TI-Signature secret")),
                           button("Copy Standard Webhooks secret", copy(s.standard, f2, "Standard Webhooks secret")));
-  box.append(button("Done, I've stored it", () => { state.secret = null; rerender(); }));
+  box.append(button("Done, I've stored it", () => { state.secret = null; state.secretWarned = false; rerender(); }));
   return box;
 }
 
@@ -1732,7 +1761,7 @@ function renderAccount(panel, d) {
 
 // ------------------------------------------------------------------ start
 buildTabs();
-$("refresh").addEventListener("click", async () => { state.secret = null; state.cache = {}; await show(state.tab, false); });
+$("refresh").addEventListener("click", async () => { if (leavingSecret()) return; state.secret = null; state.cache = {}; await show(state.tab, false); });
 $("days").addEventListener("change", async () => { state.days = Number($("days").value) === 30 ? 30 : 7;
   ["overview", "rules", "tuning"].forEach(v => { delete state.cache[v]; }); await show(state.tab, false); });
 $("trayToggle").addEventListener("click", () => { const t = $("tray"); const open = t.hidden && trayCount() > 0;
