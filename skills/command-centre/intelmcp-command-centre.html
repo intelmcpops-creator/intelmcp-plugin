@@ -248,11 +248,12 @@ fieldset .row { display: inline-flex; gap: 6px; }
 <div id="content">
 <main id="panel" role="tabpanel" tabindex="-1"></main>
 <details class="help"><summary>About this panel</summary>
-<p>This page calls IntelMCP through your own IntelMCP connection: Claude asks once whether the page
-may use it, and everything shown is your organization's data. Triage changes wait under Changes until you
+<p>This page calls IntelMCP through your own IntelMCP connection, so it shows your organization's alerts, rules
+and settings, and the collection your plan includes. The first time, Claude asks whether the page may use IntelMCP.
+It changes or deletes something only when you press a button or key; deleting and rotating a secret ask you to confirm. Triage changes wait under Changes until you
 press Apply, which sends them in as few calls as possible (at most two for a page of alerts, plus one per kind of
-exclusion). Secrets shown here once may also be kept in
-the conversation, as when you create them in chat. Times are in UTC.</p></details>
+exclusion). Webhook secrets are shown here once: copy them
+before you leave the page. Times are in UTC.</p></details>
 </div>
 </div>
 </div>
@@ -261,6 +262,10 @@ the conversation, as when you create them in chat. Times are in UTC.</p></detail
 // through the artifact runtime's `mcp` capability (their own sign-in and plan).
 // dashboard_artifact.py puts it before panel.js and routes panel.js's send() here.
 const ARTIFACT_SERVER = "IntelMCP";
+// The tools the panel only reads (filled in by dashboard_artifact.py); every other call is a change.
+const ARTIFACT_READS = new Set(["check_source", "get_context", "get_message", "preview_rule", "search_messages", "show_dashboard", "trace_forwards"]);
+// Once another account signs in to Claude, the page makes no further calls (it must be reloaded).
+let artifactStopped = false;
 let artifactMcp = null;
 function artifactMcpNs() {
   if (!artifactMcp) artifactMcp = (window.claude && typeof window.claude.use === "function")
@@ -275,7 +280,8 @@ const ARTIFACT_MESSAGES = {
   consent_required: "IntelMCP is not allowed for this page yet. Press Refresh and allow it when asked.",
   blocked_by_policy: "Your organization's policy blocks this IntelMCP tool.",
   approval_required: "Your organization requires approval for this IntelMCP tool, which pages cannot ask for yet.",
-  server_unavailable: "IntelMCP did not answer in time; nothing is known to have changed. Press Refresh to check.",
+  server_unavailable: "IntelMCP did not answer in time. Press Refresh to try again.",
+  user_changed: "Another account is now signed in to Claude. Reload this page to see that account's IntelMCP.",
   not_granted: "This page cannot reach your connectors here. Open it in Claude (claude.ai or the Claude app).",
   capability_disabled: "This page cannot reach your connectors here. Open it in Claude (claude.ai or the Claude app).",
 };
@@ -285,11 +291,12 @@ function artifactSettle(id, work) {
     e => { const p = pending.get(id); if (p) { pending.delete(id); p.reject(e); } });
 }
 async function artifactCall(name, args) {
+  if (artifactStopped) throw new PanelError("host", ARTIFACT_MESSAGES.user_changed);
   const mcp = await artifactMcpNs();
   if (!mcp) throw new PanelError("host", ARTIFACT_MESSAGES.not_granted);
   try {
     const r = await mcp.callTool(ARTIFACT_SERVER, name, args || {}, {cache: false});
-    return {content: Array.isArray(r.content) ? r.content : [], structuredContent: r.structuredContent, isError: false};
+    return {content: Array.isArray(r.content) ? r.content : [], structuredContent: r.structuredContent, isError: !!r.isError};
   } catch (e) {
     const code = e && e.code;
     if (code === "tool_error") {
@@ -298,6 +305,10 @@ async function artifactCall(name, args) {
         : [{type: "text", text: String(e.message || "IntelMCP returned an error.")}]};
     }
     if (code === "cancelled") throw new PanelError("denied", "Not changed: the action was declined in Claude.");
+    if (code === "user_changed") { artifactStopped = true; throw new PanelError("host", ARTIFACT_MESSAGES.user_changed); }
+    // No answer to a change does not mean it was not made.
+    if ((code === "server_unavailable" || code === "upstream_error") && !ARTIFACT_READS.has(name))
+      throw new PanelError("timeout", "IntelMCP did not answer, so the change may have been made. Press Refresh to check before trying again.");
     throw new PanelError("host", ARTIFACT_MESSAGES[code] || String((e && e.message) || "Claude did not run the tool."));
   }
 }
@@ -317,7 +328,8 @@ function artifactHost(m) {
   const text = document.createElement("p");
   text.textContent = "This is your IntelMCP Command Centre: your organization's live alerts, rules and settings, " +
     "through your own IntelMCP connection. The first time, Claude asks whether this page may use IntelMCP: allow it. " +
-    "Pin this page in Claude to keep it one click away. It is private to you; colleagues create their own.";
+    "It can change or delete your rules, exclusions and webhooks when you press a button; deleting and rotating a secret " +
+    "ask you to confirm. Pin this page in Claude to keep it one click away. It is private to you; colleagues create their own.";
   const ok = document.createElement("button");
   ok.type = "button"; ok.textContent = "Got it";
   ok.addEventListener("click", () => { box.hidden = true; try { localStorage.setItem("intelmcp.welcome", "1"); } catch (e) { /* not kept */ } });
@@ -355,6 +367,7 @@ const REGIONS = {
 };
 // INIT_NOTICE: when the panel says it needs Claude; a host that answers later still starts it (INIT_WAIT).
 const READ_TIMEOUT = 30000, WRITE_TIMEOUT = 300000, WAIT_NOTICE = 3000, INIT_NOTICE = 5000, INIT_WAIT = 120000;
+const CAN_STOP_WAITING = false;        // false where a call cannot be abandoned (the artifact)
 const VERDICT_ITEMS_PER_CALL = 200;   // record_verdict's limit
 const VALUES_PER_CALL = 100;          // exclude / remove_exclusion values
 const MAX_TEXT = 20000, MAX_ROWS = 200, DEFAULT_CAP = 860, NOISY_PER_DAY = 50;
@@ -413,8 +426,18 @@ function cardText(a) {
     lines.forEach(l => { const p = out[out.length - 1]; if (p !== undefined && p.length < 60 && l.length < 40) out[out.length - 1] = p + " · " + l.trim(); else out.push(l); });
     text = out.join("\n");
   }
+  const term = str(a.term).toLowerCase(); let at = term ? text.toLowerCase().indexOf(term) : 0;
+  if (at < 0 && a.excerpt) return foldBlank(a.excerpt);     // the match is past the text sent
   if (text.length <= POST_IN_CARD) return text;
-  const term = str(a.term).toLowerCase(); let at = term ? text.toLowerCase().indexOf(term) : 0; if (at < 0) at = 0;
+  if (at < 0) at = 0;
+  // A match in the closing hashtags or signature: the claim at the head, then the matched line.
+  const lineStart = text.lastIndexOf("\n", at) + 1, lineEnd = text.indexOf("\n", at);
+  const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd);
+  const words = line.replace(/https?:\/\/\S+|#\S+/g, "").replace(/[^\p{L}]/gu, "").length;
+  if (at > text.length * 0.75 || words < 15) {
+    const cut = text.lastIndexOf(" ", 300);
+    return text.slice(0, cut > 0 ? cut : 300).trim() + " … " + str(line.trim(), 120);
+  }
   if (at < CARD_SNIPPET / 2) { const end = text.lastIndexOf(" ", CARD_SNIPPET); return text.slice(0, end > 0 ? end : CARD_SNIPPET) + " …"; }
   let start = text.lastIndexOf("\n", at) + 1;
   if (at - start > 200) { const dot = text.lastIndexOf(". ", at - 40); start = dot > start && at - dot < 220 ? dot + 2 : text.indexOf(" ", at - 160) + 1; }
@@ -422,7 +445,8 @@ function cardText(a) {
   if (end < text.length) { const sp = text.lastIndexOf(" ", end); end = sp > at + term.length ? sp : end; }
   return (start > 0 ? "… " : "") + text.slice(start, end).trim() + (end < text.length ? " …" : "");
 }
-function firstLine(t) { const l = str(t).split("\n").map(x => x.trim()).find(x => x && x !== "…"); return l ? str(l, 120) : ""; }
+// The post's first line of words (decoration such as "⚠️⚠️⚠️" or "━━━━" is skipped).
+function firstLine(t) { const l = str(t).split("\n").map(x => x.trim()).find(x => /\p{L}{3}/u.test(x)); return l ? str(l, 120) : ""; }
 // Third-party text with the matched term marked: text nodes and <mark> only, never markup.
 function markedBlock(tag, text, cls, lang, term) {
   const e = textBlock(tag, "", cls, lang); const s = str(text, MAX_TEXT); const t = str(term, 100);
@@ -492,12 +516,15 @@ function button(text, handler, opts) {
   return b;
 }
 // A destructive or wide change asks once more in place ("Delete" -> "Delete rule and 312 alerts?").
+// The second click of a double-click (event.detail 2 or more) never confirms.
 function twoStep(text, confirmText, handler) {
-  let armed = false;
+  let armed = false, repeated = false;
   const b = button(text, async btn => {
     if (!armed) { armed = true; btn.textContent = typeof confirmText === "function" ? confirmText() : confirmText; btn.classList.add("danger"); return; }
+    if (repeated) return;
     armed = false; btn.textContent = text; btn.classList.remove("danger"); await handler(btn);
   }, {write: true});
+  b.addEventListener("click", ev => { repeated = ev.detail > 1; }, {capture: true});   // runs before the handler
   b.addEventListener("blur", () => { if (armed) { armed = false; b.textContent = text; b.classList.remove("danger"); } });
   return b;
 }
@@ -518,7 +545,7 @@ class PanelError extends Error { constructor(kind, message) { super(message); th
 const pending = new Map(); let nextId = 1;
 function send(m) { artifactHost(m); }
 function request(method, params, timeout) {
-  const id = nextId++;
+  const id = "imcp-" + (nextId++);   // a string no other frame can guess
   const promise = new Promise((resolve, reject) => {
     const timer = setTimeout(() => { pending.delete(id); reject(new PanelError("timeout",
       "No answer from Claude; nothing is known to have changed. Refresh to check.")); }, timeout);
@@ -585,6 +612,7 @@ function syncWrites() { document.querySelectorAll("[data-write]").forEach(b => {
 function showWaiting(id, secret) {
   if (secret) { status("Waiting for Claude (it may be asking for your approval)… The answer carries a secret shown only once, so this panel keeps waiting."); return; }
   status("Waiting for Claude (it may be asking for your approval)…");
+  if (!CAN_STOP_WAITING) return;
   const stop = button("Stop waiting", () => { const p = pending.get(id); if (p) { pending.delete(id);
     p.reject(new PanelError("stopped", "Stopped waiting. Refresh to see whether the change was made.")); } });
   stop.id = "stopWaiting"; $("status").append(" ", stop);
@@ -877,7 +905,9 @@ function alertCard(a, opts) {
   head.append(why);
   if (typeof a.lang === "string" && LANGS.includes(a.lang) && a.lang !== "en") head.append(el("span", a.lang.toUpperCase(), "badge"));
   if (num(a.repeat_count)) head.append(el("span", "+" + plural(a.repeat_count, "repost")));
-  if (a.incident_role === "update") head.append(el("span", "update", "badge"));
+  if (a.incident_via === "same") head.append(el("span", "also matched by another rule", "badge"));
+  else if (a.incident_role === "update") head.append(el("span", "update", "badge"));
+  if (a.forward_of) head.append(textBlock("span", "forwarded from " + str(a.forward_of, 80), "badge"));
   if (a.acked) head.append(el("span", "acknowledged"));
   if (a.excluded) head.append(el("span", "hidden by exclusions"));
   box.append(head);
@@ -912,16 +942,22 @@ function alertCard(a, opts) {
   box._alert = a; box._opts = opts;
   return box;
 }
+const SERVICE_PRIORITY = ["proof", "archive", "paste", "file", "actor_site", "lookup", "code"];
 // Chips under a folded card: the target countries, up to two targets, and the first proof link.
 function factChips(a) {
   const row = el("div", undefined, "facts");
   arr(a.victim_countries).slice(0, 5).forEach(c => { const chip = el("span", str(c, 3), "chip victim"); chip.title = "Target country: " + countryName(str(c)); row.append(chip); });
   const ents = arr(a.entities);
-  ents.filter(e => e && !e.role && ["domain", "url", "ip", "cve"].includes(e.type)).slice(0, 2).forEach(e => {
-    const v = str(e.value, 200); const short = e.type === "url" ? hostOf(v) : v;
-    const chip = el("span", ["url", "domain", "ip"].includes(e.type) ? defang(short) : short, "chip target"); chip.title = "Indicator (" + str(e.type) + ")"; row.append(chip); });
-  const svc = ents.find(e => e && e.role);
-  if (svc) { const chip = el("span", str(svc.role, 20) + " · " + defang(hostOf(str(svc.value, 200))), "chip svc"); chip.title = "Proof or service link, not a victim"; row.append(chip); }
+  const targets = [];   // distinct hosts, IPs and CVEs: a domain and its URL are one target
+  ents.filter(e => e && !e.role && ["domain", "url", "ip", "cve"].includes(e.type)).forEach(e => {
+    const v = str(e.value, 200); const key = (["url", "domain"].includes(e.type) ? hostOf(v) : v).toLowerCase().replace(/^www\./, "");
+    if (!targets.some(t => t.key === key)) targets.push({key: key, type: e.type}); });
+  targets.slice(0, 2).forEach(t => { const chip = el("span", t.type === "cve" ? t.key.toUpperCase() : defang(t.key), "chip target");
+    chip.title = "Indicator (" + t.type + ")"; row.append(chip); });
+  if (targets.length > 2) { const chip = el("span", "+" + (targets.length - 2), "chip target"); chip.title = plural(targets.length, "target") + " in the post: open it to see all"; row.append(chip); }
+  // The most telling proof or service link; social links and shorteners stay in the open card.
+  const svc = SERVICE_PRIORITY.map(r => ents.find(e => e && e.role === r)).find(Boolean);
+  if (svc) { const chip = el("span", str(svc.role, 20) + " · " + defang(hostOf(str(svc.value, 200)).replace(/^www\./, "")), "chip svc"); chip.title = "Proof or service link, not a victim"; row.append(chip); }
   return row.children.length ? row : null;
 }
 function hostOf(v) { try { return new URL(v).hostname; } catch (e) { return str(v).replace(/^[a-z]+:\/\//i, "").split(/[/?#]/)[0]; } }

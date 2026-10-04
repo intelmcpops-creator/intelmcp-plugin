@@ -33,6 +33,7 @@ not both.
 In claude.ai, add `https://mcp.intelmcp.io/mcp` as a custom connector instead.
 The same four are prompts there: pick them by title (Set up monitoring,
 Dashboard, Triage matches, Investigate) from the IntelMCP prompt menu.
+The command centre is created from Claude Code.
 
 Docs: https://intelmcp.io/docs/ · Privacy: https://intelmcp.io/privacy/ ·
 Terms: https://intelmcp.io/terms/ · Contact: support@intelmcp.io
