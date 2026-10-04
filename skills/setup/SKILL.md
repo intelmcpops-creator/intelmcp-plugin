@@ -63,7 +63,8 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
    they tune alerts later by asking you or from the dashboard ("show my IntelMCP dashboard"): exclude
    a noisy topic, country, channel or phrase from their alerts; narrow or widen a rule (update_rule)
    or turn off a rule (set_rule_enabled); or request a new channel. In claude.ai the dashboard opens
-   as a panel with controls to exclude, remove an exclusion and request a channel.
+   as a panel where they can also triage alerts, manage rules, exclusions and deliveries, and request
+   channels.
 
 Tuning (rules or a profile already exist):
 a. Show what exists: each rule in plain words with its hit_count (matches so far, including the 7 days
