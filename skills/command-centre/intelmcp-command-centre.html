@@ -100,6 +100,9 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 
 /* ---------------------------------------------------------------- header and tabs */
 .brand { display: inline-flex; gap: var(--s2); align-items: center; font: var(--fs-title); letter-spacing: .01em; }
+/* The organization's name: quiet, one line, whole on hover. */
+.org { color: var(--muted); font: var(--fs-meta); max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.org[hidden] { display: none; }
 .mark { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--fg); box-shadow: 0 0 0 3px var(--line-strong); }
 #trayToggle { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); font-weight: 600; border-radius: 999px;
   min-height: 28px; padding: 2px var(--s3); }
@@ -140,6 +143,9 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 .loz.t-ok { color: var(--ok); } .loz.t-danger { color: var(--danger); } .loz.t-attention { color: var(--medium); }
 .loz.t-neutral { color: var(--muted); } .loz.t-info { color: var(--low); }
 .loz.plain { text-transform: none; letter-spacing: 0; font-weight: 600; }
+/* An attack type is a fact about the post, not a severity or a status: no hue, the text's own ink. */
+.loz.atk { color: var(--fg); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.why .also { color: var(--muted); }
 .callout { display: flex; gap: var(--s3); align-items: flex-start; border: 1px solid var(--line); border-inline-start: 3px solid var(--line-strong);
   border-radius: var(--r-lg); background: var(--surface); padding: var(--s3) var(--s4); margin: var(--s3) 0; }
 .callout > svg.ic { margin-top: 2px; }
@@ -485,6 +491,7 @@ td.when { white-space: nowrap; }
 }
 /* Narrow: who and when on the first line, why on its own. */
 @media (max-width: 520px) {
+  .org { max-width: 14ch; }
   .alert .head .why { flex-basis: 100%; }
   .alert .head .handle { display: none; }
 }
@@ -499,6 +506,7 @@ td.when { white-space: nowrap; }
 <header class="top">
   <div class="bar">
     <strong class="brand"><span class="mark" aria-hidden="true"></span>IntelMCP</strong>
+    <span id="org" class="org" hidden></span>
     <button id="trayToggle" type="button" aria-expanded="false" aria-controls="tray" hidden>Changes: 0</button>
     <button id="apply" type="button" class="primary" data-write="1" hidden>Apply</button>
     <button id="discard" type="button" hidden>Discard</button>
@@ -643,6 +651,9 @@ const REGIONS = {
 const READ_TIMEOUT = 30000, WRITE_TIMEOUT = 300000, WAIT_NOTICE = 3000, INIT_NOTICE = 5000, INIT_WAIT = 120000;
 const CAN_STOP_WAITING = false;        // false where a call cannot be abandoned (the artifact)
 const VERDICT_ITEMS_PER_CALL = 200;   // record_verdict's limit
+// Attack types as the server names them (entities.attack_types), as people read them.
+const ATTACK_LABELS = {ddos: "DDoS", defacement: "Defacement", leak: "Leak", ransomware: "Ransomware", ics: "ICS/OT",
+  access_sale: "Access sale", doxx: "Doxxing"};
 const VALUES_PER_CALL = 100;          // exclude / remove_exclusion values
 const MAX_TEXT = 20000, MAX_ROWS = 200, DEFAULT_CAP = 860, NOISY_PER_DAY = 50;
 // After a write, the views it changes are loaded again.
@@ -1071,8 +1082,14 @@ async function load(view, force) {
   accept(data, view);
   return data;
 }
+// The organization's name next to the brand (text only; the whole name on hover).
+function showOrganization(name) {
+  const o = $("org"); const t = typeof name === "string" ? str(name.trim(), 80) : "";
+  o.textContent = t; o.title = t; o.hidden = !t;
+}
 function accept(data, view) {
   state.cache[view] = data;
+  if (data && "organization" in data) showOrganization(data.organization);
   if (view === "alerts") remember(data.items);
   if (view === "overview") { remember(data.latest); updateTabCounts(); }
   state.updatedAt = new Date().toISOString(); freshness();
@@ -1392,11 +1409,22 @@ function alertCard(a, opts) {
   why.append(document.createTextNode("· "));
   if (a.term) { const term = el("bdi", str(a.term, 100), "term"); why.append(document.createTextNode("matched «"), term, document.createTextNode("» · ")); }
   why.append(textBlock("span", str(a.rule_name, 60), "rulename"));
+  // The other rules that matched this post (one card per post): their term and name.
+  const also = arr(a.also_matched).filter(x => x && x.match_id);
+  also.slice(0, 2).forEach(x => {
+    const part = el("span", undefined, "also");
+    if (x.term) part.append(document.createTextNode(" + also «"), el("bdi", str(x.term, 100), "term"), document.createTextNode("» · "));
+    else part.append(document.createTextNode(" + also matched by "));
+    part.append(textBlock("span", str(x.rule_name, 60), "rulename")); why.append(part); });
+  if (also.length > 2) { const more = el("span", " + " + plural(also.length - 2, "more rule"), "also");
+    more.title = also.slice(2).map(x => str(x.rule_name, 60)).join(", "); why.append(more); }
   head.append(why);
   if (typeof a.lang === "string" && LANGS.includes(a.lang) && a.lang !== "en") head.append(lozenge(a.lang, "neutral", null, "badge"));
   if (num(a.repeat_count)) head.append(el("span", "+" + plural(a.repeat_count, "repost")));
-  if (a.incident_via === "same") head.append(lozenge("also matched by another rule", "neutral", null, "badge plain"));
+  if (a.incident_via === "same") { if (!also.length) { const sp = lozenge("same post as another alert", "neutral", null, "badge plain");
+    sp.title = "Another rule's alert, a forward or an exact copy of this post"; head.append(sp); } }
   else if (a.incident_role === "update") head.append(lozenge("update", "info", null, "badge"));
+  if (grown) attackChips(a).forEach(x => head.append(x));
   if (a.forward_of) { const f = lozenge("forwarded from " + str(a.forward_of, 80), "neutral", null, "badge plain"); f.dir = "auto"; f.title = "Forwarded from " + str(a.forward_of, 80); head.append(f); }
   if (a.claim) { const c = lozenge("claim", "attention", null, "badge"); c.title = "The channel names itself: its own claim"; head.append(c); }
   if (a.acked) head.append(lozenge("acknowledged", "ok", "check", "plain"));
@@ -1435,9 +1463,14 @@ function alertCard(a, opts) {
   return box;
 }
 const SERVICE_PRIORITY = ["proof", "archive", "paste", "file", "actor_site", "lookup", "code"];
-// Chips under a folded card: the target countries, up to two targets, and the first proof link.
+// Chips under a folded card: its attack types, the target countries, up to two targets, and the first proof link.
+function attackChips(a) {
+  return arr(a.attack_types).filter(t => typeof t === "string" && Object.prototype.hasOwnProperty.call(ATTACK_LABELS, t)).slice(0, 2)
+    .map(t => { const c = lozenge(ATTACK_LABELS[t], "neutral", null, "atk"); c.title = "Attack type, read from the post's words and links: " + ATTACK_LABELS[t]; return c; });
+}
 function factChips(a) {
   const row = el("div", undefined, "facts");
+  attackChips(a).forEach(x => row.append(x));
   arr(a.victim_countries).slice(0, 5).forEach(c => { const chip = el("span", str(c, 3), "chip victim"); chip.title = "Target country: " + countryName(str(c)); row.append(chip); });
   const ents = arr(a.entities);
   const targets = [];   // distinct hosts, IPs and CVEs: a domain and its URL are one target
@@ -1644,8 +1677,23 @@ function stageExclusion(kind, value, label, list) {
     + plural(loaded.length, "loaded alert") + (kind === "country" ? " (each hidden only if every country it names is excluded)" : "") : "") + ".");
 }
 function trayCount() { let n = state.verdicts.size + state.acks.size; state.exclusions.forEach(s => { n += s.size; }); return n; }
+// The matches one card stands for: its own and the other rules' matches of the same post.
+function cardMatches(id) {
+  const a = state.known.get(id); const ids = [id];
+  arr(a && a.also_matched).forEach(x => { if (x && Number.isInteger(x.match_id) && !ids.includes(x.match_id)) ids.push(x.match_id); });
+  return ids;
+}
+// Staged verdicts in record_verdict calls of at most 200 items, a card's matches never split.
+function verdictChunks() {
+  const chunks = []; let cur = [], n = 0;
+  state.verdicts.forEach((c, id) => { const ids = cardMatches(id);
+    if (cur.length && n + ids.length > VERDICT_ITEMS_PER_CALL) { chunks.push(cur); cur = []; n = 0; }
+    cur.push([id, c, ids]); n += ids.length; });
+  if (cur.length) chunks.push(cur);
+  return chunks;
+}
 function calls() {
-  return Math.ceil(state.verdicts.size / VERDICT_ITEMS_PER_CALL) + (state.acks.size ? 1 : 0)
+  return verdictChunks().length + (state.acks.size ? 1 : 0)
     + Array.from(state.exclusions.values()).reduce((n, s) => n + Math.ceil(s.size / VALUES_PER_CALL), 0);
 }
 function alertName(id) {
@@ -1674,22 +1722,26 @@ function renderTray() {
 async function applyTray() {
   const done = []; let failure = null; const touched = new Set();
   try {
-    const entries = Array.from(state.verdicts.entries());
-    for (let i = 0; i < entries.length; i += VERDICT_ITEMS_PER_CALL) {
-      const chunk = entries.slice(i, i + VERDICT_ITEMS_PER_CALL);
-      const items = chunk.map(([id, c]) => compact({match_id: id, verdict: c.verdict,
-        severity: c.verdict === "relevant" ? c.severity : undefined, summary: c.summary, reason: c.reason}));
+    // A card's verdict covers every match of its post (the other rules' too), so the post
+    // reads the same in every rule's view; the outcome counts cards.
+    for (const chunk of verdictChunks()) {
+      const items = [];
+      chunk.forEach(([, c, ids]) => ids.forEach(id => items.push(compact({match_id: id, verdict: c.verdict,
+        severity: c.verdict === "relevant" ? c.severity : undefined, summary: c.summary, reason: c.reason}))));
       const out = await write("record_verdict", {items: items});
       // Only what was sent leaves the tray: a change staged again while Apply waited stays.
       chunk.forEach(([id, c]) => { if (state.verdicts.get(id) === c) state.verdicts.delete(id); touched.add(id); });
-      done.push(plural(out.updated, "alert") + " judged" + (num(out.repeats_updated) ? " (" + plural(out.repeats_updated, "repost") + " follow)" : "")
-        + (arr(out.not_found).length ? ", " + arr(out.not_found).length + " no longer exist" : ""));
+      const gone = new Set(arr(out.not_found));
+      const judged = chunk.length === items.length ? num(out.updated) : chunk.filter(([id]) => !gone.has(id)).length;
+      done.push(plural(judged, "alert") + " judged" + (num(out.repeats_updated) ? " (" + plural(out.repeats_updated, "repost") + " follow)" : "")
+        + (gone.size ? ", " + gone.size + " no longer exist" : ""));
     }
     if (state.acks.size) {
-      const sent = Array.from(state.acks.entries()); const ids = sent.map(([id]) => id);
+      const sent = Array.from(state.acks.entries()); const ids = [];
+      sent.forEach(([id]) => cardMatches(id).forEach(mid => { if (!ids.includes(mid)) ids.push(mid); }));
       const out = await write("ack_matches", {match_ids: ids});
       sent.forEach(([id, token]) => { if (state.acks.get(id) === token) state.acks.delete(id); touched.add(id); });
-      done.push(num(out.acknowledged) + " acknowledged");
+      done.push((ids.length === sent.length ? num(out.acknowledged) : sent.length) + " acknowledged");
     }
     for (const [kind, set] of Array.from(state.exclusions.entries())) {
       const values = Array.from(set.keys());
