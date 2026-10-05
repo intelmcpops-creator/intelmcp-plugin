@@ -1988,8 +1988,15 @@ function indicatorRow(e, watchable) {
     button("Copy", () => copyText(shown, li), {label: "Copy " + str(shown, 60) + " (defanged)"}));
   return li;
 }
+// A clipboard that refuses, or never answers (some frames leave the request pending), falls
+// back to a field to copy by hand.
+const CLIPBOARD_WAIT = 1500;
 async function copyText(text, near, said) {
-  try { await navigator.clipboard.writeText(text); status(said || "Copied (defanged)."); return; }
+  try {
+    await Promise.race([navigator.clipboard.writeText(text),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("no answer")), CLIPBOARD_WAIT))]);
+    status(said || "Copied (defanged)."); return;
+  }
   catch (e) {
     near.querySelectorAll("input.secret").forEach(f => f.remove());
     const field = input("text", text); field.readOnly = true; field.className = "secret"; field.setAttribute("aria-label", "Copy this text");
