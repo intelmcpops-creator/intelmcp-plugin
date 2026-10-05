@@ -258,7 +258,7 @@ button.day:hover { background: var(--surface-2); }
 .arow + .arow { border-top: 1px solid var(--line); }
 .arow:hover:not(:disabled) { background: var(--surface-2); }
 .arow .ch { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.arow .ex { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: plaintext; text-align: left; }
+.arow .ex { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; unicode-bidi: isolate; text-align: start; }
 .arow .when { font: var(--fs-meta); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .ov-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s2); }
 @media (max-width: 640px) {
@@ -423,6 +423,8 @@ fieldset .row { display: inline-flex; gap: 6px; }
 .mini b { display: block; font: var(--fs-title); font-size: 20px; line-height: 28px; font-variant-numeric: tabular-nums; }
 .mini span { font: var(--fs-meta); color: var(--muted); }
 .cov-table { max-width: 860px; }
+td.when { white-space: nowrap; }
+@media (max-width: 520px) { .hide-narrow { display: none; } .tablewrap th, .tablewrap td { padding-left: var(--s2); padding-right: var(--s2); } }
 .cov-table td.num .inline-bar { margin-inline-start: 0; margin-inline-end: var(--s2); }
 .check-row { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: flex-end; }
 .check-row .field { display: flex; flex-direction: column; gap: 2px; }
@@ -1312,7 +1314,8 @@ function alertRow(a) {
   const b = button("", () => openAlert(a), {cls: "arow"}); b.dataset.match = str(a.match_id);
   const words = str(a.summary) || foldBlank(a.text || a.excerpt).replace(/\s*\n+\s*/g, " · ");
   const when = whenEl(a.posted_at, a.time); when.classList.add("when");
-  b.append(sevBadge(a.severity, a.verdict), textBlock("span", str(a.channel, 80) || "channel", "ch"), textBlock("span", str(words, 160), "ex", a.lang), when);
+  const ex = textBlock("span", str(words, 160), "ex", a.lang); ex.dir = dominantDir(words);   // one direction for the line, by its main script
+  b.append(sevBadge(a.severity, a.verdict), textBlock("span", str(a.channel, 80) || "channel", "ch"), ex, when);
   return b;
 }
 function openAlert(a) { const d = day(a.time); openAlerts(compact({rule_id: a.rule_id ? str(a.rule_id) : undefined, since: d || undefined, until: d || undefined}), a.match_id); }
@@ -1807,8 +1810,8 @@ function indicatorRow(e, watchable) {
   const type = str(e.type); const raw = str(e.normalized || e.value, 300);
   const shown = ["url", "domain", "ip"].includes(type) ? defang(raw) : raw;
   const li = el("li", undefined, "indicator");
-  li.append(el("span", type, "badge"));
-  if (e.role) li.append(el("span", str(e.role, 20), "badge"));
+  li.append(lozenge(type, "neutral", null, "badge"));
+  if (e.role) li.append(lozenge(str(e.role, 20), "info", null, "badge"));
   li.append(el("code", shown));
   if (watchable && ENTITY_TYPES.includes(type)) li.append(button("Watch", () => watch(type, raw), {label: "Watch " + type + " " + str(shown, 60) + " with a rule"}));
   li.append(button("Search", () => runSearchFor(raw), {label: "Search for " + str(shown, 60)}),
@@ -1839,9 +1842,9 @@ function watch(type, value) {
   state.rulesForm = {prefill: {name: watchName(type, value), match_type: "entity", pattern: pattern}, preview: true};
   selectTab("rules", true);
 }
-function contextCard(c) {
+function contextCard(c, terms) {
   const box = el("div", undefined, "box");
-  box.append(timeEl(c.posted_at), textBlock("div", str(c.text || c.excerpt, 2000), "excerpt", c.lang));
+  box.append(timeEl(c.posted_at), markedBlock("div", str(c.text || c.excerpt, 2000), "excerpt", c.lang, terms || []));
   return box;
 }
 function traceView(t) {
@@ -1858,6 +1861,18 @@ function traceView(t) {
   if (!box.children.length) box.append(el("p", "No forwards or copies found.", "meta"));
   return box;
 }
+// j / k and z also work when the focus has left the queue (after a header button, say): j or k
+// goes back to the card last used, or the first one.
+document.addEventListener("keydown", ev => {
+  if (ev.defaultPrevented || ev.altKey || ev.ctrlKey || ev.metaKey || ev.repeat || ev.isComposing) return;
+  const t = ev.target || {}; if (["INPUT", "SELECT", "TEXTAREA"].includes(t.tagName) || (t.closest && t.closest(".alert, details"))) return;
+  const queue = document.querySelector("#panel .queue"); if (!queue || !queue.querySelector(".alert")) return;
+  if (ev.key === "j" || ev.key === "k") { ev.preventDefault();
+    const card = (state.lastCard !== undefined && cardEl(state.lastCard)) || queue.querySelector(".alert");
+    card.focus({preventScroll: true}); card.scrollIntoView({block: "nearest"}); }
+  else if (ev.key === "z") { ev.preventDefault(); undoLast(); }
+});
+document.addEventListener("focusin", ev => { const c = ev.target && ev.target.closest && ev.target.closest(".queue .alert"); if (c && c._alert) state.lastCard = c._alert.match_id; });
 document.addEventListener("keydown", ev => {
   if (ev.key === "Escape" && state.expanded !== null && !["INPUT", "SELECT", "TEXTAREA"].includes((ev.target || {}).tagName)) { ev.preventDefault(); toggleCard(state.expanded); }
 });
@@ -1997,7 +2012,7 @@ function previewView(p) {
     + (perDay > NOISY_PER_DAY ? " That is more than " + NOISY_PER_DAY + " a day: consider narrowing it." : ""), "meta"));
   const forms = arr(p.matched_forms);
   if (forms.length) box.append(textBlock("p", "Matched as: " + forms.slice(0, 10).map(f => str(f.form, 40) + " (" + num(f.count) + ")").join(", "), "meta"));
-  arr(p.samples).forEach(s => box.append(contextCard(s)));
+  arr(p.samples).forEach(s => box.append(contextCard(s, forms.slice(0, 10).map(f => str(f.form, 100)))));
   return box;
 }
 
@@ -2246,13 +2261,13 @@ function renderSources(panel, d) {
   if (topics.length) {
     const max = Math.max(1, ...topics.map(x => num(x.posts_per_day)));
     const wrap = el("div", undefined, "tablewrap cov-table"); const t = el("table"); const h = el("tr");
-    [["Topic"], ["Live", "num"], ["Silent", "num"], ["Posts a day", "num"], ["History from"]].forEach(([x, c]) => { const th = el("th", x, c); th.scope = "col"; h.append(th); });
+    [["Topic"], ["Live", "num"], ["Silent", "num"], ["Posts a day", "num"], ["History from", "hide-narrow"]].forEach(([x, c]) => { const th = el("th", x, c); th.scope = "col"; h.append(th); });
     const thead = el("thead"); thead.append(h); const body = el("tbody");
     topics.forEach(x => { const tr = el("tr");
       const silent = el("td", fmtNum(x.silent_sources), "num"); if (num(x.silent_sources) > 0.1 * num(x.live_sources)) { silent.style.color = "var(--high)"; silent.title = "More than a tenth of this topic's sources are silent"; }
       const posts = el("td", undefined, "num"); const bar = el("span", undefined, "inline-bar"); bar.style.width = Math.max(2, Math.round(48 * num(x.posts_per_day) / max)) + "px";
       bar.setAttribute("aria-hidden", "true"); posts.append(bar, document.createTextNode(fmtNum(x.posts_per_day)));
-      const hist = el("td", x.history_from ? fmtDate(x.history_from) : "", "when");
+      const hist = el("td", x.history_from ? fmtDate(x.history_from) : "", "when hide-narrow");
       tr.append(textBlock("td", str(x.tag, 60)), el("td", fmtNum(x.live_sources), "num"), silent, posts, hist); body.append(tr); });
     t.append(thead, body); wrap.append(t);
     panel.append(el("h3", "Coverage by topic"), wrap);
