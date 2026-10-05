@@ -157,6 +157,23 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 .empty .title { font: var(--fs-title); color: var(--fg); margin: 0; }
 .empty p { margin: var(--s1) 0 0; max-width: 60em; }
 .empty .actions { margin-top: var(--s3); }
+/* A plan without Monitor: locked tabs, the locked views' list of what Monitor adds, notes in place. */
+[role="tab"].locked { color: var(--faint); }
+[role="tab"].locked[aria-selected="true"] { color: var(--fg); }
+.empty .actions { gap: var(--s3); }
+a.site { display: inline-flex; align-items: center; gap: var(--s1); }
+.plan-adds h3 { margin-top: var(--s4); }
+ul.adds { list-style: none; margin: 0 0 var(--s3); padding: 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+ul.adds li { display: grid; grid-template-columns: 7em minmax(0, 1fr); gap: var(--s3); padding: var(--s2) var(--s4); border-bottom: 1px solid var(--line); }
+ul.adds li:last-child { border-bottom: none; }
+ul.adds b { font-weight: 600; }
+ul.adds span { color: var(--muted); }
+@media (max-width: 520px) { ul.adds li { grid-template-columns: 1fr; gap: 2px; } }
+.plan-note { margin: var(--s2) 0; padding: var(--s2) var(--s3); }
+.plan-note > svg.ic { color: var(--muted); }
+.plan-note p { margin: var(--s1) 0 0; }
+.plan-note .pattern code { overflow-wrap: anywhere; }
+.indicator > .plan-note { flex: 1 1 100%; }
 .skel { border-radius: var(--r-md); background: linear-gradient(90deg, var(--surface) 0, var(--surface-2) 50%, var(--surface) 100%);
   background-size: 200% 100%; animation: sk 1.2s linear infinite; margin: 0 0 var(--s2); border: 1px solid var(--line); }
 .skel-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s2); }
@@ -616,7 +633,8 @@ function artifactHost(m) {
 // IntelMCP panel (MCP App), v2: a command centre. Server data is third-party text: it is
 // only ever set with textContent, createTextNode, new Option(text, value) or fixed
 // attributes (title, value, lang, dir), never parsed as markup. Links go to t.me posts
-// only. Writes come only from a click or a key the user presses, never from loading.
+// only, and one fixed link to the pricing page. Writes come only from a click or a key the
+// user presses, never from loading.
 
 // ------------------------------------------------------------------ constants
 const SEVERITIES = ["critical", "high", "medium", "low"];
@@ -630,6 +648,14 @@ const LANGS = ["ar", "fa", "ur", "ckb", "ru", "uk", "he", "en", "cjk"];
 const TME = /^https:\/\/t\.me\/(c\/\d+|[A-Za-z0-9_]{4,32})\/\d+$/;
 const TABS = [["overview", "Overview"], ["alerts", "Alerts"], ["rules", "Rules"], ["tuning", "Tuning"],
               ["delivery", "Delivery"], ["sources", "Sources"], ["search", "Search"], ["account", "Account"]];
+// Plans without Monitor: what the plan has comes first; the Monitor views are last, locked,
+// each with one line of what it holds on Monitor.
+const MONITOR_TABS = new Set(["overview", "alerts", "tuning"]);
+const PLAN_ORDER = ["search", "sources", "rules", "delivery", "account", "overview", "alerts", "tuning"];
+const MONITOR_HOLDS = {overview: "counts, alerts per day and what needs attention, over 7 or 30 days.",
+  alerts: "new posts your rules match, with severity, verdicts, acknowledgement and reposts grouped into incidents.",
+  tuning: "watch profiles for triage, and exclusions by topic, country, channel or phrase."};
+const PRICING_URL = "https://intelmcp.io/pricing/", SUPPORT_EMAIL = "support@intelmcp.io";
 const REGIONS = {
   "Middle East": "AE BH EG IQ IR IL JO KW LB OM PS QA SA SY TR YE",
   "Europe": "AL AD AT BY BE BA BG HR CY CZ DK EE FI FR DE GR HU IS IE IT LV LI LT LU MT MD MC ME NL MK NO PL PT RO RU SM RS SK SI ES SE CH UA GB VA",
@@ -693,6 +719,7 @@ const ICONS = {
   chevron: ["M6 3.5 10.5 8 6 12.5"],
   eyeoff: ["M2 2l12 12", "M6.6 3.7A7 7 0 0 1 8 3.5c3.6 0 6 4.5 6 4.5a11 11 0 0 1-1.9 2.4", "M10.1 11.9A6.5 6.5 0 0 1 8 12.5C4.4 12.5 2 8 2 8a11.3 11.3 0 0 1 2.6-3", "M6.6 6.6a2 2 0 0 0 2.8 2.8"],
   key: ["M2.5 10.5a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M7.6 8.4 13.5 2.5", "M11.5 4.5 13 6"],
+  lock: ["M4 7.5h8a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z", "M5.25 7.5V5a2.75 2.75 0 0 1 5.5 0v2.5"],
 };
 function icon(name, label) {
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -900,6 +927,13 @@ function link(url, label) {
   a.addEventListener("click", ev => { if (state.openLinks) { ev.preventDefault(); request("ui/open-link", {url: url}, READ_TIMEOUT).catch(() => {}); } });
   return a;
 }
+// The one link that is not a post: the pricing page, a fixed address.
+function siteLink(label) {
+  const a = el("a", label, "site"); a.append(icon("external"));
+  a.href = PRICING_URL; a.target = "_blank"; a.rel = "noopener noreferrer";
+  a.addEventListener("click", ev => { if (state.openLinks) { ev.preventDefault(); request("ui/open-link", {url: PRICING_URL}, READ_TIMEOUT).catch(() => {}); } });
+  return a;
+}
 function labelled(control, text, hidden) {
   control.id = control.id || "f" + (++uid);
   const l = el("label", text, hidden ? "vh" : undefined); l.htmlFor = control.id;
@@ -1045,6 +1079,9 @@ const state = {tab: "overview", days: 7, cache: {}, openLinks: false, initialize
   expanded: null,        // the match_id of the card that is open (grown)
   messages: new Map(), msgErrors: new Map(), loadingRefs: new Set(),   // get_message answers by message_ref
   history: [],           // staged match_ids, newest last: z undoes the last
+  plan: null,            // {name, monitor} from the first view; unknown counts as Monitor
+  monitorLimits: null,   // what Monitor allows (show_dashboard's monitor_limits)
+  chosen: false,         // the analyst picked a tab (a plan without Monitor otherwise opens on Search)
   // the tray: staged triage, applied with one record_verdict (per 200) and one ack_matches
   verdicts: new Map(), acks: new Map(), exclusions: new Map()};
 
@@ -1073,6 +1110,7 @@ async function load(view, force) {
 }
 function accept(data, view) {
   state.cache[view] = data;
+  learnPlan(data);
   if (view === "alerts") remember(data.items);
   if (view === "overview") { remember(data.latest); updateTabCounts(); }
   state.updatedAt = new Date().toISOString(); freshness();
@@ -1120,30 +1158,105 @@ function resize() {
 try { new ResizeObserver(() => resize()).observe($("content")); } catch (e) { /* older engines: resize() is called after renders */ }
 window.addEventListener("resize", () => resize());
 
+// ------------------------------------------------------------------ plan
+function hasMonitor() { return !(state.plan && state.plan.monitor === false); }
+function locked(view) { return !hasMonitor() && MONITOR_TABS.has(view); }
+function planName() { const n = str(state.plan && state.plan.name, 40); return n ? n[0].toUpperCase() + n.slice(1) : "current"; }
+function learnPlan(data) {
+  if (!data || typeof data.monitor !== "boolean") return;
+  const lim = data.monitor_limits;
+  if (lim && typeof lim === "object") state.monitorLimits = {rules: num(lim.rules), watch_profiles: num(lim.watch_profiles),
+    deliveries: num(lim.deliveries), channel_requests_per_month: num(lim.channel_requests_per_month)};
+  const before = hasMonitor();
+  state.plan = {name: str(data.plan, 40), monitor: data.monitor};
+  if (before !== hasMonitor()) paintTabs();
+}
+// What this plan has, in one line.
+function planLine() { return "This organization is on the " + planName() + " plan: search over collected posts, sources and channel requests, and the account view."; }
+// What Monitor adds, with its own numbers when show_dashboard gave them.
+function monitorAdds() {
+  const l = state.monitorLimits; const n = (k, text) => l && l[k] ? fmtNum(l[k]) + " " + text : null;
+  const items = [["Alerts", "New posts your rules match, with severity, verdicts, acknowledgement and reposts grouped into incidents."],
+    ["Rules", (l && l.rules ? "Up to " + fmtNum(l.rules) + " alert rules" : "Alert rules") + " on words, patterns or indicators, each previewed against recent history before it is saved."],
+    ["Tuning", (n("watch_profiles", "watch profiles") || "Watch profiles") + " for triage, and exclusions by topic, country, channel or phrase."],
+    ["Delivery", "Signed JSON webhooks" + (l && l.deliveries ? ": up to " + plural(l.deliveries, "webhook destination") : "") + ", sent as alerts happen."],
+    ["Overview", "Counts, alerts per day and what needs attention, over 7 or 30 days."]];
+  if (l && l.channel_requests_per_month) items.push(["Sources", "Up to " + fmtNum(l.channel_requests_per_month) + " channel requests a month, each reviewed by hand."]);
+  const ul = el("ul", undefined, "adds");
+  items.forEach(([name, text]) => { const li = el("li"); li.append(el("b", name), el("span", text)); ul.append(li); });
+  return ul;
+}
+// A Monitor view on a plan without Monitor: what it holds, what this plan has, where plans are described.
+function renderLocked(panel, view) {
+  const meta = el("p", undefined, "meta"); meta.append(lozenge("Monitor plan", "neutral", "lock"), document.createTextNode(" " + tabName(view) + ": " + MONITOR_HOLDS[view]));
+  panel.replaceChildren(viewHeader(tabName(view), meta));
+  const title = (view === "alerts" ? "Alerts are" : tabName(view) + " is") + " part of the Monitor plan";
+  panel.append(emptyState(title, planLine(), {icon: "lock", actions: [
+    button("Go to Search", () => { state.chosen = true; selectTab("search", true); }, {cls: "primary", icon: "search"}), siteLink("Plans and pricing")]}));
+  const sec = el("section", undefined, "plan-adds"); sec.append(el("h3", "What the Monitor plan adds"), monitorAdds(),
+    el("p", "Questions about this organization's plan: " + SUPPORT_EMAIL + ".", "meta"));
+  panel.append(sec);
+}
+// Rules on a plan without Monitor: said in place, the pattern kept to copy; a second press closes it.
+function planNote(near, rule, btn) {
+  const open = Array.from(near.children).find(c => c.classList.contains("plan-note"));
+  if (open) { open.remove(); if (btn) btn.setAttribute("aria-expanded", "false"); resize(); return; }
+  const box = el("div", undefined, "callout plan-note"); box.setAttribute("role", "note");
+  const b = el("div", undefined, "body"); const pattern = str(rule.pattern, 300);
+  b.append(el("strong", rule.lead), el("p", planLine(), "meta"));
+  const pat = el("p", undefined, "meta pattern"); pat.append(document.createTextNode(rule.match_type === "entity" ? "Indicator pattern: " : "Words: "), textBlock("code", pattern));
+  const acts = el("div", undefined, "actions");
+  acts.append(button("Copy pattern", () => copyText(pattern, box, "Copied the pattern."), {icon: "copy"}), siteLink("Plans and pricing"));
+  b.append(pat, acts); box.append(icon("lock"), b);
+  near.append(box);
+  if (btn) btn.setAttribute("aria-expanded", "true");
+  resize();
+}
+const RULE_LEAD = "Rules and alerts are part of the Monitor plan.";
+
 // ------------------------------------------------------------------ tabs
+function tabKeys() { return hasMonitor() ? TABS.map(t => t[0]) : PLAN_ORDER; }
+function tabNodes(view) {
+  const out = [document.createTextNode(tabName(view))];
+  if (locked(view)) out.push(document.createTextNode(" "), icon("lock"), el("span", "(Monitor plan)", "vh"));
+  return out;
+}
+function optionName(view) { return tabName(view) + (locked(view) ? " (Monitor plan)" : ""); }
 function buildTabs() {
   const list = $("tabs"), sel = $("tabSelect");
   TABS.forEach(([key, name]) => {
     const t = el("button"); t.type = "button"; t.setAttribute("role", "tab"); t.id = "tab-" + key;
     t.append(document.createTextNode(name)); t.setAttribute("aria-controls", "panel"); t.dataset.view = key;
-    t.addEventListener("click", () => selectTab(key, true));
+    t.addEventListener("click", () => { state.chosen = true; selectTab(key, true); });
     t.addEventListener("keydown", ev => {
-      const i = TABS.findIndex(x => x[0] === key); let j = null;
-      if (ev.key === "ArrowRight") j = (i + 1) % TABS.length;
-      else if (ev.key === "ArrowLeft") j = (i - 1 + TABS.length) % TABS.length;
-      else if (ev.key === "Home") j = 0; else if (ev.key === "End") j = TABS.length - 1;
-      if (j !== null) { ev.preventDefault(); selectTab(TABS[j][0], false); $("tab-" + TABS[j][0]).focus(); }
+      const keys = tabKeys(); const i = keys.indexOf(key); let j = null;
+      if (ev.key === "ArrowRight") j = (i + 1) % keys.length;
+      else if (ev.key === "ArrowLeft") j = (i - 1 + keys.length) % keys.length;
+      else if (ev.key === "Home") j = 0; else if (ev.key === "End") j = keys.length - 1;
+      if (j !== null) { ev.preventDefault(); state.chosen = true; selectTab(keys[j], false); $("tab-" + keys[j]).focus(); }
     });
     list.append(t); sel.append(new Option(name, key));
   });
-  sel.addEventListener("change", () => selectTab(sel.value, true));
+  sel.addEventListener("change", () => { state.chosen = true; selectTab(sel.value, true); });
+}
+// The plan decides the order and the locks (tabs and the narrow select alike).
+function paintTabs() {
+  const list = $("tabs"), sel = $("tabSelect");
+  tabKeys().forEach(key => {
+    const t = $("tab-" + key); const opt = Array.from(sel.options).find(o => o.value === key);
+    t.classList.toggle("locked", locked(key));
+    if (locked(key)) t.title = "Monitor plan: " + MONITOR_HOLDS[key]; else t.removeAttribute("title");
+    t.replaceChildren(...tabNodes(key)); list.append(t);
+    if (opt) { opt.textContent = optionName(key); sel.append(opt); }
+  });
+  sel.value = state.tab;
 }
 function updateTabCounts() {
   const o = state.cache.overview || {}; const head = o.headline || {}; const att = o.attention || {};
   const set = (view, n, warn, label) => {
     const t = $("tab-" + view); const opt = Array.from($("tabSelect").options).find(x => x.value === view);
-    t.replaceChildren(document.createTextNode(tabName(view)));
-    if (opt) opt.textContent = tabName(view);
+    t.replaceChildren(...tabNodes(view));
+    if (opt) opt.textContent = optionName(view);
     if (!n) return;
     const c = el("span", undefined, "count" + (warn ? " warn" : "")); c.setAttribute("aria-label", label);
     if (warn) c.append(icon("alert"));
@@ -1186,6 +1299,8 @@ async function show(view, focusPanel) {
   try {
     const data = await load(view, false);
     if (state.tab !== view) return;
+    // A plan without Monitor opens on Search, unless the Overview was picked.
+    if (data && data.unavailable === "monitor_plan" && view === "overview" && !state.chosen) { selectTab("search", focusPanel); return; }
     render(view, data);
   } catch (err) {
     if (state.tab !== view) return;
@@ -1202,10 +1317,7 @@ function done(focusPanel) {
 function tabName(view) { const t = TABS.find(x => x[0] === view); return t ? t[1] : view; }
 function render(view, data) {
   const panel = $("panel"); panel.replaceChildren(viewHeader(tabName(view)));
-  if (data && data.unavailable === "monitor_plan") {
-    panel.append(emptyState("Part of the Monitor plan.", "This organization's plan includes search, sources and the account view; plans are listed at intelmcp.io.", {icon: "pause"}));
-    return;
-  }
+  if (data && data.unavailable === "monitor_plan") { renderLocked(panel, view); return; }
   ({overview: renderOverview, alerts: renderAlerts, rules: renderRules, tuning: renderTuning,
     delivery: renderDelivery, sources: renderSources, account: renderAccount})[view](panel, data || {});
   syncWrites();
@@ -1814,13 +1926,18 @@ function indicatorRow(e, watchable) {
   li.append(lozenge(type, "neutral", null, "badge"));
   if (e.role) li.append(lozenge(str(e.role, 20), "info", null, "badge"));
   li.append(el("code", shown));
-  if (watchable && ENTITY_TYPES.includes(type)) li.append(button("Watch", () => watch(type, raw), {label: "Watch " + type + " " + str(shown, 60) + " with a rule"}));
+  if (watchable && ENTITY_TYPES.includes(type)) {
+    const w = button("Watch", b => watch(type, raw, li, b), {label: "Watch " + type + " " + str(shown, 60) + " with a rule",
+      icon: hasMonitor() ? undefined : "lock", title: hasMonitor() ? undefined : "Rules are part of the Monitor plan"});
+    if (!hasMonitor()) w.setAttribute("aria-expanded", "false");
+    li.append(w);
+  }
   li.append(button("Search", () => runSearchFor(raw), {label: "Search for " + str(shown, 60)}),
     button("Copy", () => copyText(shown, li), {label: "Copy " + str(shown, 60) + " (defanged)"}));
   return li;
 }
-async function copyText(text, near) {
-  try { await navigator.clipboard.writeText(text); status("Copied (defanged)."); return; }
+async function copyText(text, near, said) {
+  try { await navigator.clipboard.writeText(text); status(said || "Copied (defanged)."); return; }
   catch (e) {
     near.querySelectorAll("input.secret").forEach(f => f.remove());
     const field = input("text", text); field.readOnly = true; field.className = "secret"; field.setAttribute("aria-label", "Copy this text");
@@ -1838,8 +1955,9 @@ function watchName(type, value) {
   if (["url", "domain", "ip"].includes(type)) short = defang(short);
   return str("Watch " + type + " " + short, 100);
 }
-function watch(type, value) {
+function watch(type, value, near, btn) {
   const pattern = type + ":" + (type === "country" ? value.toUpperCase() : value);
+  if (!hasMonitor() && near) { planNote(near, {lead: "Watching an indicator takes an alert rule. " + RULE_LEAD, match_type: "entity", pattern: pattern}, btn); return; }
   state.rulesForm = {prefill: {name: watchName(type, value), match_type: "entity", pattern: pattern}, preview: true};
   selectTab("rules", true);
 }
@@ -1885,7 +2003,12 @@ const TYPE_HELP = {word: "whole words; Arabic and Hebrew words also match prefix
   entity: "an indicator as type:value, e.g. cve:CVE-2026-1234, ip:203.0.113.7, domain:example.com, sha256:…, country:IL"};
 function renderRules(panel, d) {
   const lim = d.limit || {}; const monitor = d.monitor !== false;
-  headMeta(panel, fmtNum(lim.used) + " of " + plural(lim.max, "rule"));
+  headMeta(panel, monitor ? fmtNum(lim.used) + " of " + plural(lim.max, "rule") : num(lim.used) ? plural(lim.used, "rule") : "");
+  // A rule begun before the plan was known (Watch, Make a rule) is said in place, never a form.
+  if (!monitor && state.rulesForm && state.rulesForm.prefill) {
+    const pf = state.rulesForm.prefill; state.rulesForm = null;
+    const box = el("div"); panel.append(box); planNote(box, {lead: RULE_LEAD, match_type: pf.match_type, pattern: pf.pattern});
+  }
   if (monitor) headActions(panel, button("Add a rule", () => { state.rulesForm = {adding: true}; rerender(); }, {cls: "primary", icon: "plus"}));
   const list = arr(d.rules); const hl = state.highlight && state.highlight.view === "rules" ? state.highlight : null;
   const prefill = state.rulesForm && state.rulesForm.prefill;
@@ -1894,10 +2017,12 @@ function renderRules(panel, d) {
     setTimeout(() => { const f = $("rf-name"); if (f) { f.focus({preventScroll: true}); form.scrollIntoView({block: "nearest"}); } }, 0);
     if (state.rulesForm.preview) { state.rulesForm.preview = false; setTimeout(() => { const pb = form.querySelector("button.preview"); if (pb) pb.click(); }, 0); }
   }
-  if (!list.length) panel.append(emptyState("No alert rules yet", "Rules match words, patterns or indicators in new posts, and in up to 7 days of history "
+  if (!list.length && !monitor) panel.append(emptyState("No alert rules", "Rules match words, patterns or indicators in new posts and raise alerts; "
+    + "they are part of the Monitor plan. " + planLine(), {icon: "lock", actions: [siteLink("Plans and pricing")]}));
+  else if (!list.length) panel.append(emptyState("No alert rules yet", "Rules match words, patterns or indicators in new posts, and in up to 7 days of history "
     + "when you create one. The setup_monitoring prompt in the IntelMCP menu sets them up in two questions.", {icon: "plus"}));
   else panel.append(rulesTable(d, list, monitor, hl));
-  if (!monitor) panel.append(el("p", MONITOR_ONLY + ": adding, editing and turning on rules. Rules left from it can be turned off or deleted.", "meta limit-note"));
+  if (!monitor && list.length) panel.append(el("p", MONITOR_ONLY + ": adding, editing and turning on rules. Rules left from it can be turned off or deleted.", "meta limit-note"));
   if (state.rulesForm && state.rulesForm.edit) setTimeout(() => { const f = $("ed-name"); if (f) { f.focus({preventScroll: true}); f.closest(".editor").scrollIntoView({block: "nearest"}); } }, 0);
   if (hl) { state.highlight = null; setTimeout(() => { const h = $("panel").querySelector(".rule.highlight"); if (h) h.scrollIntoView({block: "nearest"}); }, 0); }
 }
@@ -2158,7 +2283,8 @@ function ruleNames(ids) {
 function renderDelivery(panel, d) {
   const lim = d.limit || {}; const monitor = d.monitor !== false;
   if (!state.cache.rules) load("rules", false).then(() => { if (state.tab === "delivery") rerender(); }).catch(() => {});
-  headMeta(panel, fmtNum(lim.used) + " of " + plural(lim.max, "enabled destination") + ". Matches are pushed as they happen, unjudged, to webhooks you give.");
+  headMeta(panel, (monitor ? fmtNum(lim.used) + " of " + plural(lim.max, "enabled destination") + ". "
+    : num(lim.used) ? plural(lim.used, "enabled destination") + ". " : "") + "Matches are pushed as they happen, unjudged, to webhooks you give.");
   const form = el("div", undefined, "box"); form.hidden = !state.addingWebhook;
   if (monitor) {
     const target = input("url", "", {maxLength: 2000, placeholder: "https://"});
@@ -2178,7 +2304,9 @@ function renderDelivery(panel, d) {
   if (state.secret) panel.append(secretBox());
   panel.append(form);
   const list = arr(d.deliveries); const hl = state.highlight && state.highlight.view === "delivery";
-  if (!list.length) panel.append(emptyState("No webhook yet", "A webhook receives each new alert as a signed JSON event, unjudged, within seconds of the match.", {icon: "plus"}));
+  if (!list.length && !monitor) panel.append(emptyState("No webhooks", "A webhook receives each new alert as a signed JSON event; alerts and webhooks are part of the Monitor plan. "
+    + planLine(), {icon: "lock", actions: [siteLink("Plans and pricing")]}));
+  else if (!list.length) panel.append(emptyState("No webhook yet", "A webhook receives each new alert as a signed JSON event, unjudged, within seconds of the match.", {icon: "plus"}));
   list.forEach(x => {
     const box = el("div", undefined, "dest"); const [hText, hClass] = health(x); const look = HEALTH_LOOK[hClass];
     const bad = hClass === "failing" || (!x.enabled && str(x.paused_reason) && !/by you/i.test(str(x.paused_reason)));
@@ -2216,7 +2344,7 @@ function renderDelivery(panel, d) {
     panel.append(box);
   });
   if (hl) state.highlight = null;
-  if (!monitor) panel.append(el("p", MONITOR_ONLY + ": adding webhooks, resuming, routing, tests and secrets. Destinations left from it can be paused or deleted.", "meta"));
+  if (!monitor && list.length) panel.append(el("p", MONITOR_ONLY + ": adding webhooks, resuming, routing, tests and secrets. Destinations left from it can be paused or deleted.", "meta"));
 }
 function routeEditor(x) {
   const det = el("details"); det.append(el("summary", "Rules routed"));
@@ -2392,11 +2520,17 @@ function searchResults(r, more) {
       const m = el("div", undefined, "more"); card.append(m); card.classList.add("open"); drawMore(m, found, {});
       tog.textContent = "Close"; tog.setAttribute("aria-expanded", "true"); resize(); };
     const tog = button("Open", toggle); tog.setAttribute("aria-expanded", "false");
-    act.append(tog, button("Make a rule from this", () => { state.rulesForm = {prefill: {name: str(state.search && state.search.query, 60), match_type: "word", pattern: str(state.search && state.search.query, 200)}, preview: true}; selectTab("rules", true); }));
+    const words = str(state.search && state.search.query, 200);
+    const make = button("Make a rule from this", b => {
+      if (!hasMonitor()) { planNote(card, {lead: RULE_LEAD, match_type: "word", pattern: words}, b); return; }
+      state.rulesForm = {prefill: {name: str(words, 60), match_type: "word", pattern: words}, preview: true}; selectTab("rules", true); },
+      {icon: hasMonitor() ? undefined : "lock", title: hasMonitor() ? undefined : "Rules are part of the Monitor plan"});
+    if (!hasMonitor()) make.setAttribute("aria-expanded", "false");
+    act.append(tog, make);
     const tg = link(c.link, "Telegram"); if (tg.tagName === "A") act.append(tg);
     card.append(meta, markedBlock("div", str(c.excerpt || c.text, 600), "excerpt", c.lang, terms), act);
     card.addEventListener("click", ev => { const t = ev.target;
-      if (!t || !t.closest || t.closest("button, a, input, select, textarea, summary, label, details, .more")) return;
+      if (!t || !t.closest || t.closest("button, a, input, select, textarea, summary, label, details, .more, .plan-note")) return;
       let sel = ""; try { sel = String(window.getSelection() || ""); } catch (e) { sel = ""; } if (sel.trim()) return;
       toggle(); });
     box.append(card); });
@@ -2419,7 +2553,7 @@ function renderAccount(panel, d) {
   const when = (sub.renews_at ? "renews " + fmtDate(sub.renews_at) : "") + (sub.ends_at ? (sub.renews_at ? ", " : "") + "ends " + fmtDate(sub.ends_at) : "");
   if (when) subLine.append(document.createTextNode(" " + when));
   section("Plan", "plan").append(kv([["Plan", lozenge(str(a.plan, 40), "info")], ["Subscription", state_ ? subLine : "none"],
-    ["Plans and billing", "intelmcp.io"]]));
+    ["Plans and billing", siteLink("intelmcp.io/pricing")]]));
   const usage = section("Usage", "usage"); const ms = el("div", undefined, "meters");
   const m = (label, used, max, note) => { if (num(max)) ms.append(meter(label, used, max, note));
     else { const f = el("div", undefined, "meter"); const nums = el("div", undefined, "nums"); const v = el("span"); v.append(el("b", fmtNum(used)), document.createTextNode(note ? " · " + note : ""));
