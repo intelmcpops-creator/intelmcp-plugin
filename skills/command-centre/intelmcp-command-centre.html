@@ -416,11 +416,11 @@ fieldset .row { display: inline-flex; gap: 6px; }
 .dest { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s3) var(--s4); margin: var(--s2) 0; background: var(--surface); }
 .dest.bad { border-inline-start: 3px solid var(--critical-bar); }
 .dest.highlight { box-shadow: 0 0 0 1px var(--control); }
-.dest .row code { font-size: 13px; }
+.dest .row code { font-size: 12px; }
 .dest .err { color: var(--danger); }
 .summary-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s2); margin-bottom: var(--s2); }
 .mini { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s2) var(--s3); }
-.mini b { display: block; font: var(--fs-title); font-size: 20px; line-height: 28px; font-variant-numeric: tabular-nums; }
+.mini b { display: block; font: var(--fs-kpi); font-variant-numeric: tabular-nums; }
 .mini span { font: var(--fs-meta); color: var(--muted); }
 .cov-table { max-width: 860px; }
 td.when { white-space: nowrap; }
@@ -459,8 +459,9 @@ td.when { white-space: nowrap; }
 @media (max-width: 520px) {
   #tabs { display: none; } .narrow-only { display: inline-block; margin-bottom: 6px; }
   header.top { padding: 6px var(--s2) 0; } #content { padding: var(--s2); }
+  label[for="days"] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  #expand { order: 9; }
   .kpi { padding: var(--s2) var(--s3); min-height: 84px; }
-  .kpi b { font-size: 24px; line-height: 28px; }
   .kpi .spark { display: none; }
   .alert { padding: 10px var(--s3); }
 }
