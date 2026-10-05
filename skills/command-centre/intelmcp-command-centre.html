@@ -53,7 +53,7 @@
 html, body { margin: 0; height: 100%; }
 body { overflow: hidden; font: var(--fs-body); color: var(--fg); background: var(--bg); }
 #app { display: flex; flex-direction: column; height: 100vh; }
-header.top { position: sticky; top: 0; z-index: 2; flex: none; background: var(--raised); border-bottom: 1px solid var(--line);
+header.top { position: sticky; top: 0; z-index: 5; flex: none; background: var(--raised); border-bottom: 1px solid var(--line);
   padding: var(--s2) var(--s3) 0; }
 .scroll { flex: 1; min-height: 0; overflow: auto; scroll-padding-top: 48px; }
 #content { padding: var(--s3) var(--s3) var(--s4); }
@@ -104,9 +104,9 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 .org { color: var(--muted); font: var(--fs-meta); max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .org[hidden] { display: none; }
 .mark { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--fg); box-shadow: 0 0 0 3px var(--line-strong); }
-#trayToggle { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); font-weight: 600; border-radius: 999px;
-  min-height: 28px; padding: 2px var(--s3); }
-#trayToggle[hidden], #apply[hidden], #discard[hidden] { display: none; }
+.days { display: inline-flex; align-items: center; gap: var(--s2); }
+.days[hidden] { display: none; }
+#refresh svg.ic { width: 16px; height: 16px; }
 #updated { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tabs-nav { margin-top: var(--s2); }
 #tabs { display: flex; gap: var(--s1); flex-wrap: wrap; }
@@ -122,10 +122,15 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 .status button { min-height: 24px; padding: 1px var(--s2); }
 .error { color: var(--danger); font: var(--fs-meta); padding-bottom: var(--s1); }
 .error:empty { display: none; }
-.tray { max-height: 40vh; overflow: auto; border-top: 1px solid var(--line); padding: 6px 0 var(--s2); }
-.tray ul { margin: 0; padding-inline-start: var(--s4); }
-.tray li { margin: 2px 0; }
-.tray li button { min-height: 24px; padding: 0 var(--s2); margin-inline-start: var(--s1); }
+/* What was saved, over the page just under the header, with Undo: it never moves the cards. */
+.toast { position: absolute; inset-inline-end: var(--s3); top: calc(100% + var(--s2)); z-index: 4; display: flex; align-items: center;
+  gap: var(--s2); max-width: calc(100% - 2 * var(--s3)); padding: 6px var(--s2) 6px var(--s3); border-radius: var(--r-lg);
+  background: var(--surface); color: var(--fg); border: 1px solid var(--line-strong); border-inline-start: 3px solid var(--ok);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .28); font: var(--fs-body); }
+.toast[hidden] { display: none; }
+.toast > svg.ic { color: var(--ok); }
+.toast .msg { min-width: 0; overflow-wrap: anywhere; }
+.toast button.undo { min-height: 28px; padding: 2px var(--s3); font-weight: 600; color: var(--accent); border-color: var(--accent); background: none; }
 
 /* ---------------------------------------------------------------- shared components */
 .vhead { display: flex; align-items: center; gap: var(--s2) var(--s3); flex-wrap: wrap; margin: 0 0 var(--s3); }
@@ -192,8 +197,9 @@ ul.adds span { color: var(--muted); }
 .menu .items { position: absolute; inset-inline-end: 0; top: calc(100% + 4px); z-index: 3; min-width: 168px; display: flex; flex-direction: column;
   padding: var(--s1); background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-lg);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .35); }
-.menu .items button { justify-content: flex-start; border: none; background: none; min-height: 32px; white-space: nowrap; }
-.menu .items button:hover:not(:disabled) { background: var(--surface-2); }
+.menu .items button, .menu .items a { justify-content: flex-start; border: none; background: none; min-height: 32px; white-space: nowrap; }
+.menu .items a { display: flex; align-items: center; gap: 6px; padding: var(--s1) 10px; border-radius: var(--r-md); color: var(--fg); text-decoration: none; }
+.menu .items button:hover:not(:disabled), .menu .items a:hover { background: var(--surface-2); }
 .menu .items button.danger, .menu .items button.destructive { color: var(--danger); }
 .switch { width: 34px; min-width: 34px; height: 20px; min-height: 20px; padding: 0; border-radius: 999px; border: 1px solid var(--control);
   background: var(--surface-2); position: relative; display: inline-block; vertical-align: middle; }
@@ -289,21 +295,36 @@ button.day:hover { background: var(--surface-2); }
   .arow .ex { grid-column: 1 / -1; grid-row: 2; }
 }
 
-/* ---------------------------------------------------------------- alerts: filters, bulk bar, cards */
+/* ---------------------------------------------------------------- alerts: verdict tabs, filters, bulk bar, cards */
 .qf { display: flex; gap: var(--s2); flex-wrap: wrap; align-items: center; margin-bottom: var(--s2); }
 .qf select { max-width: 100%; }
-.seg-ctl { display: inline-flex; border: 1px solid var(--control); border-radius: var(--r-md); overflow: hidden; }
-.seg-ctl button { border: none; border-radius: 0; background: var(--surface); min-height: 30px; }
+.seg-ctl { display: inline-flex; border: 1px solid var(--control); border-radius: var(--r-md); overflow: hidden; max-width: 100%; }
+.seg-ctl button { border: none; border-radius: 0; background: var(--surface); min-height: 32px; white-space: nowrap; }
 .seg-ctl button + button { border-inline-start: 1px solid var(--line-strong); }
-.qf button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
-.qf .row { gap: 6px; }
-.keys-hint { font: var(--fs-meta); color: var(--muted); margin: var(--s1) 0 var(--s2); }
-.keys-hint kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: var(--r-sm);
-  padding: 0 4px; color: var(--fg); background: var(--surface); }
-.box.bulk { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: var(--s1) var(--s2); position: sticky; top: 0; z-index: 1; margin-top: 0; }
+.qf .seg-ctl button[aria-pressed="true"] { background: var(--accent-soft); color: var(--fg); font-weight: 600; box-shadow: inset 0 -2px 0 var(--accent); }
+.qf button.on { border-color: var(--accent); background: var(--accent-soft); }
+.qf button[aria-expanded="true"] { box-shadow: inset 0 -2px 0 var(--accent); }
+.keys > summary { font-weight: 600; color: var(--muted); border: 1px solid var(--line-strong); border-radius: 999px; min-width: 28px; min-height: 28px; }
+.keys .items { min-width: 280px; padding: var(--s2) var(--s3); white-space: normal; cursor: auto; }
+.keys .items p { margin: 0 0 var(--s2); }
+ul.keys-hint { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s1); font: var(--fs-meta); color: var(--muted); }
+.keys-hint li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: var(--s2); align-items: baseline; }
+.keys-hint .k { display: inline-flex; gap: 2px; flex-wrap: wrap; }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: var(--r-sm);
+  padding: 0 4px; color: var(--fg); background: var(--surface); line-height: 16px; }
+.alert-filters { margin: 0 0 var(--s2); padding: var(--s2) var(--s3); border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+.alert-filters .checks { display: flex; flex-wrap: wrap; gap: var(--s1) var(--s4); flex-basis: 100%; }
+.alert-filters .row > input[type="checkbox"] { order: -1; }
+.alert-filters .row { gap: 6px; }
+.alert-filters select { max-width: 16em; }
+.box.bulk { flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding: var(--s1) var(--s2); position: sticky; top: 0; z-index: 2; margin-top: 0;
+  border-color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 60%, var(--surface)); overflow: visible; }
+.box.bulk[hidden] { display: none; }
+@media (max-width: 640px) { .box.bulk { flex-wrap: wrap; } }
 .bulk input[type="checkbox"] { margin: 0 var(--s1); }
-.bulk button, .bulk select { min-height: 28px; padding: 2px var(--s2); font: var(--fs-meta); }
-.bulk .count-sel { font: var(--fs-meta); color: var(--muted); white-space: nowrap; padding: 0 var(--s1); font-variant-numeric: tabular-nums; }
+.bulk button, .bulk .split > .sevmenu > summary { min-height: 28px; }
+.bulk button { padding: 2px var(--s2); }
+.bulk .count-sel { color: var(--fg); font-weight: 600; white-space: nowrap; padding: 0 var(--s1); font-variant-numeric: tabular-nums; }
 .queue { max-width: 1240px; }
 .alert { border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s3) var(--s4); margin: var(--s2) 0; background: var(--surface);
   cursor: pointer; scroll-margin-top: var(--s2); }
@@ -311,9 +332,13 @@ button.day:hover { background: var(--surface-2); }
 .alert:focus { outline: none; }
 .alert:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .alert.expanded { border-color: var(--control); cursor: auto; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong); }
-.alert.has-change { box-shadow: inset 3px 0 0 var(--accent); }
-.alert.has-change.expanded { box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px var(--line-strong); }
-.alert.staged-out > :not(.head):not(.cardfoot):not(.actions) { opacity: .6; }
+.alert.selected { border-color: var(--accent); }
+.actions button.close { margin-inline-start: auto; }
+/* Judged out of the tab it is listed under: quieter until the next load. */
+.alert.judged > :not(.head):not(.cardfoot):not(.actions) { opacity: .55; }
+.alert[aria-busy="true"] .actions button:not(:disabled) { cursor: progress; }
+.card-note, .card-error { margin: 0; font: var(--fs-meta); flex-basis: 100%; }
+.alert > .card-note, .alert > .card-error { margin: var(--s1) 0 0; }
 .head { row-gap: 2px; font: var(--fs-meta); }
 .head button.link { font-weight: 600; color: var(--fg); text-decoration-color: var(--line-strong); }
 .handle { font-family: var(--mono); font-size: 12px; color: var(--faint); }
@@ -351,15 +376,22 @@ mark { background: var(--accent-soft); color: var(--fg); border-radius: 3px; pad
 }
 .actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: var(--s1); }
 .actions a { display: inline-flex; align-items: center; gap: 2px; }
-.sevchips { display: inline-flex; border: 1px solid var(--control); border-radius: var(--r-md); overflow: visible; }
-.sevchips button:first-child { border-radius: 5px 0 0 5px; } .sevchips button:last-child { border-radius: 0 5px 5px 0; }
-.sevchips button:focus-visible { outline-offset: -2px; position: relative; z-index: 1; }
-.sevchips button { border: none; border-radius: 0; min-width: 32px; font-family: var(--mono); font-weight: 600; background: var(--surface); }
-.sevchips button + button { border-inline-start: 1px solid var(--line-strong); }
-.sevchips .c-critical { color: var(--critical); } .sevchips .c-high { color: var(--high); }
-.sevchips .c-medium { color: var(--medium); } .sevchips .c-low { color: var(--low); }
-.sevchips button[aria-pressed="true"] { background: color-mix(in srgb, currentColor var(--tint), var(--surface)); box-shadow: inset 0 -3px 0 currentColor; }
-.staged { font: var(--fs-label); color: var(--accent); }
+/* Relevant ▾: the main part saves the default severity; the caret opens the four severities. */
+.split { position: relative; display: inline-flex; }
+.split > button.rel { border-start-end-radius: 0; border-end-end-radius: 0; }
+.split > .menu { position: static; }
+.split > .sevmenu > summary { min-width: 28px; border: 1px solid var(--control); border-inline-start: 1px solid var(--line-strong);
+  border-start-start-radius: 0; border-end-start-radius: 0; background: var(--surface-2); color: var(--fg); margin-inline-start: -1px; }
+.split > .sevmenu > summary svg.ic { transform: rotate(90deg); width: 12px; height: 12px; }
+.split > .sevmenu[open] > summary svg.ic { transform: rotate(-90deg); }
+.sevmenu .items { inset-inline-start: 0; inset-inline-end: auto; min-width: 176px; }
+.sevmenu .items button { gap: var(--s2); }
+.sevmenu .items kbd { margin-inline-start: auto; }
+.sevmenu .items button[aria-current="true"] { font-weight: 600; background: var(--surface-2); }
+i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.actions button.rel[aria-pressed="true"], .actions button.notrel[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent);
+  font-weight: 600; }
+.actions .cardmenu > summary { border-color: var(--line-strong); }
 .indicator { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 3px 0; }
 .indicator code { flex: 1; min-width: 160px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -506,9 +538,18 @@ td.when { white-space: nowrap; }
   .alert:not(.expanded) > .cardfoot .actions { margin: 0; flex-wrap: nowrap; }
   .alert:not(.expanded) > .cardfoot .facts { justify-content: flex-end; max-width: 26em; order: 2; }
 }
+/* Phones and touch screens: the card's buttons are 44 px targets. */
+@media (max-width: 520px), (pointer: coarse) {
+  .alert .actions > button, .alert .actions > .split > button, .alert .actions > .split > details > summary,
+  .alert .actions > details > summary, .bulk button, .bulk .split > .sevmenu > summary, .toast button { min-height: 44px; min-width: 44px; }
+  .menu .items button, .menu .items a { min-height: 44px; }
+}
+.loz.new { color: var(--low); }
 /* Narrow: who and when on the first line, why on its own. */
 @media (max-width: 520px) {
   .org { max-width: 14ch; }
+  .alert-filters select { max-width: 100%; }
+  .qf .keys { display: none; }   /* the keys are for a keyboard */
   .alert .head .why { flex-basis: 100%; }
   .alert .head .handle { display: none; }
 }
@@ -524,13 +565,10 @@ td.when { white-space: nowrap; }
   <div class="bar">
     <strong class="brand"><span class="mark" aria-hidden="true"></span>IntelMCP</strong>
     <span id="org" class="org" hidden></span>
-    <button id="trayToggle" type="button" aria-expanded="false" aria-controls="tray" hidden>Changes: 0</button>
-    <button id="apply" type="button" class="primary" data-write="1" hidden>Apply</button>
-    <button id="discard" type="button" hidden>Discard</button>
     <span class="grow"></span>
-    <label for="days">Window</label>
-    <select id="days"><option value="7">7 days</option><option value="30">30 days</option></select>
-    <button id="refresh" type="button">Refresh</button>
+    <span id="daysWrap" class="days"><label for="days">Window</label>
+    <select id="days"><option value="7">7 days</option><option value="30">30 days</option></select></span>
+    <button id="refresh" type="button" class="icon-only" aria-label="Refresh" title="Refresh"></button>
     <button id="expand" type="button" hidden>Expand</button>
     <span id="updated" class="meta"></span>
   </div>
@@ -541,7 +579,7 @@ td.when { white-space: nowrap; }
   </nav>
   <div id="status" class="status" role="status" aria-live="polite"></div>
   <div id="error" class="error" role="alert"></div>
-  <section id="tray" class="tray" aria-label="Pending changes" hidden></section>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 </header>
 <div id="scroll" class="scroll">
 <div id="content">
@@ -549,9 +587,9 @@ td.when { white-space: nowrap; }
 <details class="help"><summary>About this panel</summary>
 <p>This page calls IntelMCP through your own IntelMCP connection, so it shows your organization's alerts, rules
 and settings, and the collection your plan includes. The first time, Claude asks whether the page may use IntelMCP.
-It changes or deletes something only when you press a button or key; deleting and rotating a secret ask you to confirm. Triage changes wait under Changes until you
-press Apply, which sends them in as few calls as possible (at most two for a page of alerts, plus one per kind of
-exclusion). Webhook secrets are shown here once: copy them
+It changes or deletes something only when you press a button or key; deleting and rotating a secret ask you to confirm. A verdict, an acknowledgement or a hidden
+channel, country, topic or phrase is saved when you press it, in one call; Undo (or the z key) puts back the last
+verdict. Hiding alerts asks you once more first. Webhook secrets are shown here once: copy them
 before you leave the page. Times are in UTC.</p></details>
 </div>
 </div>
@@ -563,6 +601,14 @@ before you leave the page. Times are in UTC.</p></details>
 const ARTIFACT_SERVER = "IntelMCP";
 // The tools the panel only reads (filled in by dashboard_artifact.py); every other call is a change.
 const ARTIFACT_READS = new Set(["check_source", "get_context", "get_message", "preview_rule", "search_messages", "show_dashboard", "trace_forwards"]);
+// The last time this browser opened the page (kept in this browser only): panel.js marks the
+// alerts matched since then as new. This visit is remembered for the next one.
+const ARTIFACT_LAST_VISIT = (function () {
+  let prev = null;
+  try { prev = localStorage.getItem("intelmcp.lastVisit"); localStorage.setItem("intelmcp.lastVisit", new Date().toISOString()); }
+  catch (e) { prev = null; }
+  return prev;
+})();
 // Once another account signs in to Claude, the page makes no further calls (it must be reloaded).
 let artifactStopped = false;
 let artifactMcp = null;
@@ -648,6 +694,14 @@ function artifactHost(m) {
 const SEVERITIES = ["critical", "high", "medium", "low"];
 const SEV_KEYS = {"1": "critical", "2": "high", "3": "medium", "4": "low"};
 const SEV_CLASSES = new Set([...SEVERITIES, "unjudged", "irrelevant"]);
+// One vocabulary for verdicts: To review, Relevant, Not relevant (the classes keep the server's words).
+const SEV_WORDS = {unjudged: "to review", irrelevant: "not relevant"};
+function sevWord(k) { return SEV_WORDS[k] || k; }
+// The last time this browser opened the page, where the page can remember it (the artifact):
+// alerts matched since then are marked new. The MCP App keeps nothing, so it marks nothing.
+const LAST_VISIT = typeof ARTIFACT_LAST_VISIT === "string" && isFinite(Date.parse(ARTIFACT_LAST_VISIT)) ? Date.parse(ARTIFACT_LAST_VISIT) : null;
+function isNew(a) { const t = Date.parse(str(a && a.time)); return LAST_VISIT !== null && isFinite(t) && t > LAST_VISIT; }
+function newMark() { const n = lozenge("new", "info", null, "new"); n.title = "Matched since your last visit in this browser"; return n; }
 const VERDICTS = ["unreviewed", "relevant", "irrelevant"];
 const KINDS = ["topic", "country", "channel", "phrase"];
 const MATCH_TYPES = ["word", "substring", "regex", "entity"];
@@ -731,6 +785,7 @@ const ICONS = {
   eyeoff: ["M2 2l12 12", "M6.6 3.7A7 7 0 0 1 8 3.5c3.6 0 6 4.5 6 4.5a11 11 0 0 1-1.9 2.4", "M10.1 11.9A6.5 6.5 0 0 1 8 12.5C4.4 12.5 2 8 2 8a11.3 11.3 0 0 1 2.6-3", "M6.6 6.6a2 2 0 0 0 2.8 2.8"],
   key: ["M2.5 10.5a3 3 0 1 0 6 0a3 3 0 1 0 -6 0", "M7.6 8.4 13.5 2.5", "M11.5 4.5 13 6"],
   lock: ["M4 7.5h8a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1z", "M5.25 7.5V5a2.75 2.75 0 0 1 5.5 0v2.5"],
+  refresh: ["M13.25 8a5.25 5.25 0 1 1-1.54-3.71", "M13.25 2.25v3h-3"],
 };
 function icon(name, label) {
   const svg = document.createElementNS(SVG_NS, "svg");
@@ -788,16 +843,21 @@ function errorState(message, retry) {
   return box;
 }
 // The quiet actions of a row: a menu that needs no positioning script; it closes on a click elsewhere.
-function menu(label, items) {
-  const d = el("details", undefined, "menu"); const s = el("summary"); s.setAttribute("aria-label", label); s.title = "More actions";
-  s.append(icon("more")); const list = el("div", undefined, "items"); list.setAttribute("role", "group"); list.setAttribute("aria-label", label);
+// opts: icon (default "more") or text for the summary, cls, title, closeOnPick (a pick closes it).
+function menu(label, items, opts) {
+  const o = opts || {};
+  const d = el("details", undefined, "menu" + (o.cls ? " " + o.cls : "")); const s = el("summary"); s.setAttribute("aria-label", label); s.title = o.title || "More actions";
+  if (o.text) s.append(document.createTextNode(o.text)); else s.append(icon(o.icon || "more"));
+  const list = el("div", undefined, "items"); list.setAttribute("role", "group"); list.setAttribute("aria-label", label);
   items.filter(Boolean).forEach(x => list.append(x));
+  // capture: buttons stop their own clicks from bubbling
+  if (o.closeOnPick) list.addEventListener("click", ev => { if (ev.target.closest && ev.target.closest("button, a")) d.open = false; }, true);
   d.append(s, list);
   return d;
 }
 document.addEventListener("click", ev => { document.querySelectorAll("details.menu[open]").forEach(d => { if (!d.contains(ev.target)) d.open = false; }); }, true);
 document.addEventListener("keydown", ev => { if (ev.key !== "Escape") return; document.querySelectorAll("details.menu[open]").forEach(d => {
-  d.open = false; const s = d.querySelector("summary"); if (s) s.focus(); }); });
+  d.open = false; ev.preventDefault(); const s = d.querySelector("summary"); if (s) s.focus(); }); });
 function switchButton(on, label, handler, opts) {
   const b = button("", handler, {write: true, label: label, cls: "switch"});
   b.setAttribute("role", "switch"); b.setAttribute("aria-checked", on ? "true" : "false");
@@ -930,10 +990,10 @@ function fmtTime(iso) { const s = str(iso); return s.length >= 16 ? s.slice(0, 1
 function timeEl(iso) { return iso ? el("span", fmtTime(iso), "time") : el("span"); }
 function day(iso) { return str(iso).slice(0, 10); }
 function defang(s) { return str(s).replace(/^http/i, "hxxp").replace(/\./g, "[.]"); }
-function link(url, label) {
+function link(url, label, withIcon) {
   if (typeof url !== "string" || !TME.test(url)) return el("span", label);
   const a = el("a", label);
-  if (label === "Telegram") a.append(icon("external"));
+  if (label === "Telegram" || withIcon) a.append(icon("external"));
   a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer";
   a.addEventListener("click", ev => { if (state.openLinks) { ev.preventDefault(); request("ui/open-link", {url: url}, READ_TIMEOUT).catch(() => {}); } });
   return a;
@@ -953,6 +1013,7 @@ function labelled(control, text, hidden) {
 function input(type, value, attrs) {
   const i = el(type === "textarea" ? "textarea" : "input");
   if (type !== "textarea") i.type = type;
+  if (["text", "search", "textarea"].includes(type)) i.dir = "auto";   // Arabic or Hebrew typed reads right to left
   if (value !== undefined && value !== null) { if (type === "checkbox") i.checked = !!value; else i.value = String(value); }
   Object.entries(attrs || {}).forEach(([k, v]) => { if (["maxLength", "placeholder", "min", "max", "id"].includes(k)) i[k] = v; });
   return i;
@@ -988,7 +1049,7 @@ function twoStep(text, confirmText, handler) {
 }
 function sevBadge(sev, verdict) {
   const key = verdict === "irrelevant" ? "irrelevant" : (sevOf(sev) || "unjudged");
-  return el("span", key, "sev " + sevClass(key));
+  return el("span", sevWord(key), "sev " + sevClass(key));
 }
 let countryName = c => c;
 try { const names = new Intl.DisplayNames(["en"], {type: "region"}); countryName = c => { try { return names.of(c) || c; } catch (e) { return c; } }; } catch (e) { /* offline names unavailable */ }
@@ -1085,16 +1146,17 @@ const NO_FILTER = {verdict: "", min_severity: "", rule_id: "", unacked_only: fal
 const state = {tab: "overview", days: 7, cache: {}, openLinks: false, initialized: false, cap: DEFAULT_CAP,
   modes: [], fullscreen: false, filters: Object.assign({}, NO_FILTER, {verdict: "unreviewed"}),
   cursors: [], cursor: null, selection: new Set(), secret: null, rulesForm: null, search: null, highlight: null,
-  known: new Map(),      // match_id -> alert, for names in the tray and Prev / Next
+  known: new Map(),      // match_id -> alert, for the matches a card stands for and Undo
   channels: new Map(),   // channel_id -> title, from loaded alerts (for channel exclusions)
   expanded: null,        // the match_id of the card that is open (grown)
   messages: new Map(), msgErrors: new Map(), loadingRefs: new Set(),   // get_message answers by message_ref
-  history: [],           // staged match_ids, newest last: z undoes the last
+  saving: new Set(),     // cards whose save waits for an answer
+  cardErrors: new Map(), // match_id -> why its last save did not go through
+  lastSave: null,        // what Undo (z) puts back: {kind: "verdict", before: Map(id -> judgment)} or {kind: "ack"}
+  alertFiltersOpen: false,
   plan: null,            // {name, monitor} from the first view; unknown counts as Monitor
   monitorLimits: null,   // what Monitor allows (show_dashboard's monitor_limits)
-  chosen: false,         // the analyst picked a tab (a plan without Monitor otherwise opens on Search)
-  // the tray: staged triage, applied with one record_verdict (per 200) and one ack_matches
-  verdicts: new Map(), acks: new Map(), exclusions: new Map()};
+  chosen: false};        // the analyst picked a tab (a plan without Monitor otherwise opens on Search)
 
 function remember(items) {
   arr(items).forEach(a => { if (a && a.match_id) { state.known.set(a.match_id, a);
@@ -1282,7 +1344,7 @@ function updateTabCounts() {
     if (opt) opt.textContent = tabName(view) + " (" + fmtNum(n) + (warn ? " failing" : "") + ")";
   };
   if (!o.unavailable) {
-    set("alerts", num(head.unreviewed), false, plural(head.unreviewed, "unreviewed alert"));
+    set("alerts", num(head.unreviewed), false, plural(head.unreviewed, "alert") + " to review");
     set("delivery", num(att.failing_deliveries), true, plural(att.failing_deliveries, "delivery failing or paused", "deliveries failing or paused"));
   }
 }
@@ -1298,6 +1360,7 @@ function selectTab(view, focusPanel) {
   if (state.tab !== view && leavingSecret()) { $("tab-" + state.tab).focus(); return; }
   if (state.tab !== view) { state.secret = null; state.expanded = null; if (!writing) status(""); }
   state.tab = view;
+  $("daysWrap").hidden = view !== "overview";   // the window is the Overview's
   TABS.forEach(([key]) => { const t = $("tab-" + key); const on = key === view;
     t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1; });
   $("tabSelect").value = view;
@@ -1375,7 +1438,7 @@ function renderOverview(panel, d) {
       kpis.append(b);
     };
     const nd = num(d.days) === 30 ? 30 : 7;
-    kpi("Unreviewed", h.unreviewed, prev && prev.unreviewed, () => openAlerts({verdict: "unreviewed", since: windowStart()}));
+    kpi("To review", h.unreviewed, prev && prev.unreviewed, () => openAlerts({verdict: "unreviewed", since: windowStart()}));
     kpi("High + critical", h.high_critical, prev && prev.high_critical, () => openAlerts({min_severity: "high", since: windowStart()}),
       {sevbar: num(h.high_critical) > 0});
     kpi("Alerts in " + nd + " days", h.alerts, prev && prev.alerts, () => openAlerts({since: windowStart()}), {spark: sparkline(totals)});
@@ -1410,14 +1473,17 @@ function renderOverview(panel, d) {
   }
   if (!firstRun) {
     const sec = el("section", undefined, "ov-chart"); sec.append(el("h3", "Alerts per day"), chart(arr(d.per_day), win)); grid.append(sec);
-    const latest = arr(d.latest).filter(a => a && a.match_id).slice(0, 5);
+    // Never an alert marked not relevant; the most severe first, then the rest as the server ranked them.
+    const rank = a => { const i = SEVERITIES.indexOf(sevOf(a.severity)); return i < 0 ? SEVERITIES.length : i; };
+    const latest = arr(d.latest).filter(a => a && a.match_id && a.verdict !== "irrelevant")
+      .map((a, i) => [a, i]).sort((x, y) => rank(x[0]) - rank(y[0]) || x[1] - y[1]).map(x => x[0]).slice(0, 5);
     // Titled by what it can show: severity order means little while nothing is judged.
-    const all = latest.length && latest.every(a => a.verdict !== "irrelevant" && !sevOf(a.severity));
-    const ls = el("section", undefined, "ov-latest"); ls.append(el("h3", all ? "Latest unreviewed" : "Most severe alerts"));
+    const all = latest.length && latest.every(a => !sevOf(a.severity));
+    const ls = el("section", undefined, "ov-latest"); ls.append(el("h3", all ? "Latest to review" : "Most severe alerts"));
     if (!latest.length) ls.append(el("p", "No alerts in this window.", "meta"));
     else { const box = el("div", undefined, "rows"); latest.forEach(a => box.append(alertRow(a))); ls.append(box); }
     const foot = el("div", undefined, "ov-foot");
-    foot.append(num(h.unreviewed) ? button("View all " + fmtNum(h.unreviewed) + " unreviewed", () => openAlerts({verdict: "unreviewed"}), {cls: "link"})
+    foot.append(num(h.unreviewed) ? button("View all " + fmtNum(h.unreviewed) + " to review", () => openAlerts({verdict: "unreviewed"}), {cls: "link"})
                                   : button("View all alerts", () => openAlerts({since: windowStart()}), {cls: "link"}));
     const ex = el("span", plural(d.exclusions, "exclusion") + " in place · ", "meta"); ex.append(button("Tuning", () => selectTab("tuning", true), {cls: "link"}));
     foot.append(ex); ls.append(foot); grid.append(ls);
@@ -1443,7 +1509,8 @@ function perDayTotals(perDay, window) {
 function alertRow(a) {
   const b = button("", () => openAlert(a), {cls: "arow"}); b.dataset.match = str(a.match_id);
   const words = str(a.summary) || foldBlank(a.text || a.excerpt).replace(/\s*\n+\s*/g, " · ");
-  const when = whenEl(a.posted_at, a.time); when.classList.add("when");
+  const when = el("span", undefined, "when"); if (isNew(a)) when.append(newMark(), " ");
+  when.append(whenEl(a.posted_at, a.time));
   const ex = textBlock("span", str(words, 160), "ex", a.lang); ex.dir = dominantDir(words);   // one direction for the line, by its main script
   b.append(sevBadge(a.severity, a.verdict), textBlock("span", str(a.channel, 80) || "channel", "ch"), ex, when);
   return b;
@@ -1480,35 +1547,158 @@ function chart(perDay, window) {
   if (days.length) { labels.append(el("span", days[0]), el("span", days[Math.floor((days.length - 1) / 2)] || ""), el("span", days[days.length - 1])); }
   const legend = el("div", undefined, "legend");
   keys.forEach(s => { const n = days.reduce((t, k) => t + (byDay[k][s] || 0), 0); const sp = el("span"); const i = el("i", undefined, "s-" + s);
-    sp.append(i, document.createTextNode(s + " "), el("b", fmtNum(n))); legend.append(sp); });
+    sp.append(i, document.createTextNode(sevWord(s) + " "), el("b", fmtNum(n))); legend.append(sp); });
   const table = el("table", undefined, "vh"); const head = el("tr"); head.append(el("th", "Day"));
-  keys.forEach(s => head.append(el("th", s))); table.append(head);
+  keys.forEach(s => head.append(el("th", sevWord(s)))); table.append(head);
   days.forEach(k => { const tr = el("tr"); tr.append(el("td", k)); keys.forEach(s => tr.append(el("td", byDay[k][s] || 0))); table.append(tr); });
   wrap.append(box, labels, legend, table);
   return wrap;
 }
 
-// ------------------------------------------------------------------ alert cards, keys and the tray
-function stagedText(id) {
-  const c = state.verdicts.get(id); const parts = [];
-  if (c) parts.push(c.verdict === "relevant" && c.severity ? "relevant · " + c.severity : str(c.verdict));
-  if (state.acks.has(id)) parts.push("acknowledge");
-  return parts.join(" · ");
+// ------------------------------------------------------------------ alert cards: every verdict saves at once
+// A card has two verdict buttons (Relevant, with a severity menu, and Not relevant) and a menu.
+// Each press is one call; the card changes when IntelMCP answers, and Undo (z) puts it back.
+const UNDO_FOR = 8000;
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function alertOf(id) { const c = cardEl(id); return (c && c._alert) || state.known.get(id) || null; }
+// What an alert's verdict would be if pressed without a choice: its own severity, else medium.
+function defaultSeverity(a) { return sevOf(a && a.severity) || "medium"; }
+function verdictWords(c) { return c.verdict === "relevant" ? "relevant" + (sevOf(c.severity) ? " · " + c.severity : "") : c.verdict === "irrelevant" ? "not relevant" : "to review"; }
+// The judgment an alert carries now (summary and note kept, so a verdict never drops them).
+function judgment(a) { return {verdict: VERDICTS.includes(a.verdict) ? a.verdict : "unreviewed", severity: sevOf(a.severity),
+  summary: str(a.summary) || null, reason: str(a.reason) || null}; }
+// The matches one card stands for: its own and the other rules' matches of the same post.
+function cardMatches(id) {
+  const a = alertOf(id); const ids = [id];
+  arr(a && a.also_matched).forEach(x => { if (x && Number.isInteger(x.match_id) && !ids.includes(x.match_id)) ids.push(x.match_id); });
+  return ids;
 }
+function verdictItem(id, c) {
+  return compact({match_id: id, verdict: c.verdict, severity: c.verdict === "relevant" ? c.severity : undefined, summary: c.summary, reason: c.reason});
+}
+// Cards in calls of at most 200 matches, a card's matches never split (a page is one call).
+function chunked(entries) {
+  const chunks = []; let cur = [], n = 0;
+  entries.forEach(e => { const k = cardMatches(e[0]).length;
+    if (cur.length && n + k > VERDICT_ITEMS_PER_CALL) { chunks.push(cur); cur = []; n = 0; }
+    cur.push(e); n += k; });
+  if (cur.length) chunks.push(cur);
+  return chunks;
+}
+function setAlert(id, fields) {
+  const seen = new Set();
+  [cardEl(id) && cardEl(id)._alert, state.known.get(id)].forEach(a => { if (a && !seen.has(a)) { seen.add(a); Object.assign(a, fields); } });
+}
+// Saves run one after another: a key pressed while one waits is saved next, never two writes at once.
+let saveChain = Promise.resolve();
+function queued(fn) { const run = saveChain.then(fn); saveChain = run.catch(() => {}); return run; }
+function waiting(ids) { ids.forEach(id => { state.saving.add(id); state.cardErrors.delete(id); refreshCard(id); }); }
+// A save that did not go through: the card says why and keeps what it showed. No answer, or a
+// stopped wait, may still have saved: those messages say so.
+function saveFailed(ids, err) {
+  const kind = err && err.kind, text = str(err && err.message ? err.message : err, 280);
+  const msg = ["denied", "timeout", "stopped"].includes(kind) ? text : "Not saved: " + text;
+  ids.forEach(id => { state.saving.delete(id); state.cardErrors.set(id, msg); refreshCard(id); });
+  showError(err);
+}
+// Sends judgments (Map id -> judgment), one record_verdict per 200 matches; each card changes once its call is answered.
+async function sendVerdicts(judgments) {
+  const chunks = chunked(Array.from(judgments.entries()));
+  for (let i = 0; i < chunks.length; i++) {
+    const items = [];
+    chunks[i].forEach(([id, c]) => cardMatches(id).forEach(mid => { if (!items.some(x => x.match_id === mid)) items.push(verdictItem(mid, c)); }));
+    try { await write("record_verdict", {items: items}); }
+    catch (err) { saveFailed(chunks.slice(i).flat().map(e => e[0]), err); return false; }
+    chunks[i].forEach(([id, c]) => { setAlert(id, {verdict: c.verdict, severity: c.severity, summary: c.summary, reason: c.reason});
+      state.saving.delete(id); state.cardErrors.delete(id); refreshCard(id); });
+  }
+  clearError();
+  return true;
+}
+// A verdict (or a summary and note) for some cards: changeFor(id, now) gives what changes.
+function judge(ids, changeFor, label) {
+  const list = ids.filter(id => alertOf(id));
+  if (!list.length) return Promise.resolve(false);
+  waiting(list);
+  return queued(async () => {
+    const before = new Map(list.map(id => [id, judgment(alertOf(id))]));
+    const after = new Map(list.map(id => [id, Object.assign({}, before.get(id), changeFor(id, before.get(id)))]));
+    if (!await sendVerdicts(after)) return false;
+    state.lastSave = {kind: "verdict", before: before};
+    // One alert marked not relevant: the toast also offers to hide alerts like it.
+    const fewer = list.length === 1 && after.get(list[0]).verdict === "irrelevant" && before.get(list[0]).verdict !== "irrelevant"
+      ? {label: "Fewer like this?", title: "Hide alerts like this one: a channel, country, topic or phrase", fn: () => openTune(list[0])} : null;
+    toast("Saved: " + (list.length > 1 ? plural(list.length, "alert") + " " : "") + label, true, fewer);
+    return true;
+  });
+}
+function judgeOne(id, verdict, severity) {
+  const c = {verdict: verdict, severity: verdict === "relevant" ? severity : null};
+  return judge([id], () => c, verdictWords(c));
+}
+// Undo (the toast's button or z): the last verdict back as it was, in one call.
+function undoLast() {
+  const last = state.lastSave;
+  if (!last) { status("Nothing to undo."); return; }
+  if (last.kind === "ack") { status("An acknowledgement cannot be undone here."); return; }
+  const t = $("toast"), hadFocus = t.contains(document.activeElement);
+  state.lastSave = null; hideToast();
+  const ids = Array.from(last.before.keys());
+  waiting(ids);
+  if (hadFocus) { const c = cardEl(ids[0]); if (c) c.focus({preventScroll: true}); }
+  queued(async () => {
+    if (!await sendVerdicts(last.before)) { state.lastSave = last; return; }
+    const was = last.before.get(ids[0]);
+    toast("Undone: " + (ids.length > 1 ? plural(ids.length, "alert") + " back as they were" : was.verdict === "unreviewed" ? "back in To review"
+      : "back to " + verdictWords(was)) + ".", false);
+  });
+}
+// Acknowledge: one ack_matches for every match of the cards. It cannot be taken back here.
+function acknowledge(ids) {
+  const list = ids.filter(id => { const a = alertOf(id); return a && !a.acked; });
+  if (!list.length) { status(ids.length > 1 ? "Those alerts are acknowledged already." : "Already acknowledged."); return Promise.resolve(false); }
+  waiting(list);
+  return queued(async () => {
+    const mids = []; list.forEach(id => cardMatches(id).forEach(m => { if (!mids.includes(m)) mids.push(m); }));
+    try { await write("ack_matches", {match_ids: mids}); } catch (err) { saveFailed(list, err); return false; }
+    list.forEach(id => { setAlert(id, {acked: true}); state.saving.delete(id); refreshCard(id); });
+    clearError();
+    state.lastSave = {kind: "ack"};
+    toast("Acknowledged" + (list.length > 1 ? ": " + plural(list.length, "alert") : "") + ".", false);
+    return true;
+  });
+}
+// What was saved, under the header for a few seconds (longer while the pointer or focus is on it), with Undo.
+let toastTimer = null;
+function toast(text, undo, extra) {
+  const t = $("toast"); clearTimeout(toastTimer);
+  t.replaceChildren(icon("check"), el("span", text, "msg"));
+  if (undo) t.append(button("Undo", () => undoLast(), {write: true, cls: "undo", label: "Undo: " + text, title: "Undo (z)"}));
+  if (extra) t.append(button(extra.label, () => { hideToast(); extra.fn(); }, {cls: "link", title: extra.title}));
+  t.hidden = false; resize();
+  const later = () => { toastTimer = setTimeout(() => {
+    if (t.matches(":hover") || t.contains(document.activeElement)) later(); else { t.hidden = true; resize(); } }, UNDO_FOR); };
+  later();
+}
+function hideToast() { clearTimeout(toastTimer); $("toast").hidden = true; }
+
 function alertCard(a, opts) {
-  const box = el("div", undefined, "alert"); box.dataset.match = str(a.match_id); box.tabIndex = 0;
-  const grown = state.expanded !== null && state.expanded === a.match_id;
-  const staged = stagedText(a.match_id);
-  if (staged) box.classList.add("has-change");
-  const change = state.verdicts.get(a.match_id);
-  if (change && change.verdict === "irrelevant") box.classList.add("staged-out");
+  const id = a.match_id;
+  const box = el("div", undefined, "alert"); box.dataset.match = str(id); box.tabIndex = 0;
+  const grown = state.expanded !== null && state.expanded === id;
   if (grown) box.classList.add("expanded");
+  // In the queue, a card judged out of the tab it is listed under stays in place, quieter, until the next load.
+  const f = state.filters;
+  if (opts.select && f.verdict && a.verdict && a.verdict !== f.verdict) box.classList.add("judged");
+  if (state.saving.has(id)) box.setAttribute("aria-busy", "true");
   // Head: one status word (the badge), who posted it and when, and why it alerted.
   const head = el("div", undefined, "row meta head");
   if (opts.select) {
-    const cb = input("checkbox", state.selection.has(a.match_id));
+    const cb = input("checkbox", state.selection.has(id));
     cb.setAttribute("aria-label", "Select: " + str(a.channel, 60) + ", " + fmtTime(a.time));
-    cb.addEventListener("change", () => { if (cb.checked) state.selection.add(a.match_id); else state.selection.delete(a.match_id); selectedCount(); });
+    if (cb.checked) box.classList.add("selected");
+    cb.addEventListener("change", () => { if (cb.checked) state.selection.add(id); else state.selection.delete(id);
+      box.classList.toggle("selected", cb.checked); syncBulk(); });
     head.append(cb);
   }
   const chan = button(str(a.channel, 80) || "channel", () => openAlerts({channel_id: str(a.channel_id), channel_label: str(a.channel, 80)}),
@@ -1516,6 +1706,7 @@ function alertCard(a, opts) {
   chan.dir = "auto";
   head.append(sevBadge(a.severity, a.verdict), chan);
   if (a.channel_username) head.append(el("span", "@" + str(a.channel_username, 32), "handle"));
+  if (isNew(a)) head.append(newMark());
   head.append(whenEl(a.posted_at, a.time));
   const why = el("span", undefined, "why");
   why.append(document.createTextNode("· "));
@@ -1550,29 +1741,70 @@ function alertCard(a, opts) {
     if (!a.summary && line && !excerpt.includes(line.replace(/…$/, ""))) box.append(textBlock("div", line, "headline", a.lang));
     box.append(markedBlock("div", excerpt, "excerpt", a.lang, a.term));
   }
-  const actions = el("div", undefined, "actions");
-  const tog = button(grown ? "Close" : "Open", () => toggleCard(a.match_id),
-    {label: (grown ? "Close" : "Open") + " the post: " + str(a.channel, 60)});
-  tog.setAttribute("aria-expanded", grown ? "true" : "false");
-  tog.setAttribute("aria-controls", "more-" + str(a.match_id));
-  actions.append(sevChips(a.match_id), button("Irrelevant", () => stageAndRefresh(a.match_id, {verdict: "irrelevant"})),
-    button("Ack", () => { stageAck(a.match_id); refreshCard(a.match_id); }, {label: "Acknowledge"}), tog);
-  const tg = link(a.link, "Telegram"); if (tg.tagName === "A") actions.append(tg);
-  if (staged) { actions.append(el("span", staged, "staged"),
-    button("Undo", () => { state.verdicts.delete(a.match_id); state.acks.delete(a.match_id); renderTray(); refreshCard(a.match_id); }, {label: "Undo the staged change"})); }
-  if (grown) box.append(actions);
-  else { const row = el("div", undefined, "cardfoot"); const facts = factChips(a); if (facts) row.append(facts); row.append(actions); box.append(row); }
-  if (grown) { const more = el("div", undefined, "more"); more.id = "more-" + str(a.match_id); box.append(more); drawMore(more, a, opts); }
+  // Actions: Relevant ▾, Not relevant, ⋯; under them, a save that waits or did not go through.
+  const actions = triageActions(a);
+  // The grown card also has a visible way to fold it (besides Esc, the menu and its head).
+  if (grown) actions.append(button("", () => toggleCard(id), {cls: "quiet icon-only close", icon: "x", label: "Close the post", title: "Close (Esc)"}));
+  const note = state.saving.has(id) ? el("p", "Saving…", "meta card-note")
+    : state.cardErrors.has(id) ? el("p", state.cardErrors.get(id), "error card-error") : null;
+  if (grown) { box.append(actions); if (note) box.append(note); }
+  else { const row = el("div", undefined, "cardfoot"); const facts = factChips(a); if (facts) row.append(facts); row.append(actions);
+    if (note) row.append(note); box.append(row); }
+  if (grown) { const more = el("div", undefined, "more"); more.id = "more-" + str(id); box.append(more); drawMore(more, a, opts); }
   // A click on the card itself (not a control, not inside the grown part, not a text selection) opens or closes it.
   box.addEventListener("click", ev => {
     const t = ev.target;
     if (!t || !t.closest || t.closest("button, a, input, select, textarea, summary, label, details, .more")) return;
     let sel = ""; try { sel = String(window.getSelection() || ""); } catch (e) { sel = ""; }
     if (sel.trim()) return;
-    toggleCard(a.match_id);
+    toggleCard(id);
   });
   box._alert = a; box._opts = opts;
   return box;
+}
+// The severity menu's items: a dot of the severity's colour, its name, its key.
+function sevItems(pick, current) {
+  return SEVERITIES.map((s, i) => { const b = button(cap(s), () => pick(s), {write: true, label: "Relevant, " + s, title: "Relevant, " + s + " (key " + (i + 1) + ")"});
+    b.dataset.sev = s; b.prepend(el("i", undefined, "dot s-" + s)); b.append(el("kbd", String(i + 1)));
+    if (current === s) b.setAttribute("aria-current", "true");
+    return b; });
+}
+function relevantSplit(main, pick, current, title) {
+  const rel = button("Relevant", main, {write: true, cls: "rel", title: title});
+  const split = el("span", undefined, "split");
+  split.append(rel, menu("Relevant, choose severity", sevItems(pick, current), {icon: "chevron", cls: "sevmenu", title: "Choose the severity", closeOnPick: true}));
+  return split;
+}
+function triageActions(a) {
+  const id = a.match_id, sev = defaultSeverity(a);
+  const bar = el("div", undefined, "actions");
+  const split = relevantSplit(() => judgeOne(id, "relevant", sev), s => judgeOne(id, "relevant", s),
+    a.verdict === "relevant" ? sevOf(a.severity) : null, "Mark relevant, " + sev + " (keys 1 to 4 choose the severity)");
+  split.querySelector(".rel").setAttribute("aria-pressed", a.verdict === "relevant" ? "true" : "false");
+  const not = button("Not relevant", () => judgeOne(id, "irrelevant"), {write: true, cls: "notrel", title: "Mark not relevant (key x)"});
+  not.setAttribute("aria-pressed", a.verdict === "irrelevant" ? "true" : "false");
+  bar.append(split, not, cardMenu(a));
+  return bar;
+}
+function cardMenu(a) {
+  const id = a.match_id, grown = state.expanded === id, post = typeof a.link === "string" && TME.test(a.link);
+  const items = [];
+  if (post) items.push(link(a.link, "Open in Telegram", true));
+  const ack = button(a.acked ? "Acknowledged" : "Acknowledge", () => acknowledge([id]), {write: true, title: "Mark it handled (key a)"});
+  if (a.acked) { ack.disabled = true; ack.removeAttribute("data-write"); }
+  const tog = button(grown ? "Close the post" : "Open the full post", () => toggleCard(id), {title: "Enter or o"});
+  tog.setAttribute("aria-expanded", grown ? "true" : "false"); tog.setAttribute("aria-controls", "more-" + str(id));
+  items.push(ack, tog, button("Hide alerts like this", () => openTune(id)));
+  if (post) items.push(button("Copy link", () => copyText(a.link, cardEl(id) || $("panel"), "Copied the link."), {icon: "copy"}));
+  return menu("More actions: " + str(a.channel, 60), items, {cls: "cardmenu", closeOnPick: true});
+}
+// Hide alerts like this: the card grows with its exclusion controls open.
+function openTune(id) {
+  state.tuneOpen = id;
+  if (state.expanded !== id) toggleCard(id);
+  const t = cardEl(id) && cardEl(id).querySelector("details.tune"); if (!t) return;
+  t.open = true; const s = t.querySelector("select"); if (s) s.focus({preventScroll: true});
+  t.scrollIntoView({block: "nearest"}); resize();
 }
 const SERVICE_PRIORITY = ["proof", "archive", "paste", "file", "actor_site", "lookup", "code"];
 // Chips under a folded card: its attack types, the target countries, up to two targets, and the first proof link.
@@ -1667,8 +1899,10 @@ function drawMore(more, a, opts) {
   if (a.match_id) {
     side.append(button("Alerts from this channel", () => openAlerts({channel_id: str(a.channel_id), channel_label: str(a.channel, 80)}), {cls: "link"}));
     const tune = el("details", undefined, "tune"); tune.append(el("summary", "Hide alerts like this"));
+    tune.open = state.tuneOpen === a.match_id;   // kept open when the post loads and the part is drawn again
+    tune.addEventListener("toggle", () => { if (tune.open) state.tuneOpen = a.match_id; else if (state.tuneOpen === a.match_id) state.tuneOpen = null; });
     const ex = el("div", undefined, "row"); ex.append(...excludeControls(a, (opts && opts.list) || []));
-    tune.append(ex, phraseForm());
+    tune.append(ex, phraseForm((opts && opts.list) || []));
     foot.append(noteForm(a), tune);
   }
   more.replaceChildren(main, side, foot);
@@ -1682,7 +1916,10 @@ async function loadMessage(a) {
   catch (err) { state.msgErrors.set(ref, str(err.message, 300)); }
   finally { state.loadingRefs.delete(ref); }
   document.querySelectorAll('.more[data-ref="' + CSS.escape(ref) + '"]').forEach(m => {
-    const owner = m.closest(".alert, .result"); if (owner && owner._alert) drawMore(m, owner._alert, owner._opts); });
+    const owner = m.closest(".alert, .result"); if (!owner || !owner._alert) return;
+    // Drawn again with the post: the focus stays where it was (the exclusion controls, else the card).
+    const had = m.contains(document.activeElement); drawMore(m, owner._alert, owner._opts);
+    if (had) (m.querySelector("details.tune[open] select") || owner).focus({preventScroll: true}); });
   resize();
 }
 function contextView(ctx) {
@@ -1694,45 +1931,64 @@ function contextView(ctx) {
   if (!box.children.length) box.append(el("p", "No surrounding posts stored.", "meta"));
   return box;
 }
+// The exclusion controls of the grown card: what to hide, then Hide, which says on the first
+// press how many loaded alerts it applies to and saves on the second.
 function excludeControls(a, list) {
-  const what = select([["", "Exclude…"], ["channel:" + str(a.channel_id), "This channel"]]
+  const what = select([["", "Choose what to hide"], ["channel:" + str(a.channel_id), "This channel"]]
     .concat(arr(a.countries).map(c => ["country:" + str(c), "Country " + countryName(str(c))]))
     .concat(arr(a.topics).map(t => ["topic:" + str(t), "Topic " + str(t, 40)])));
-  what.setAttribute("aria-label", "What to exclude: " + str(a.channel, 60));
-  return [what, button("Stage exclusion", () => { const v = what.value; if (!v) return;
-    const i = v.indexOf(":"); stageExclusion(v.slice(0, i), v.slice(i + 1), v.startsWith("channel:") ? str(a.channel, 80) : null, list); })];
+  what.setAttribute("aria-label", "What to hide: " + str(a.channel, 60));
+  const chosen = () => { const v = what.value, i = v.indexOf(":"); return v && i > 0 ? {kind: v.slice(0, i), value: v.slice(i + 1)} : null; };
+  const hide = twoStep("Hide", () => { const c = chosen(); return c ? "Hide? It " + impact(c.kind, c.value, list) + "." : "Choose what to hide first"; },
+    async () => { const c = chosen(); if (!c) return;
+      await hideLike(c.kind, c.value, c.kind === "channel" ? str(a.channel, 80) : c.kind === "country" ? countryName(c.value) : c.value); });
+  return [what, hide];
 }
-function sevChips(id) {
-  const group = el("span", undefined, "sevchips"); group.setAttribute("role", "group"); group.setAttribute("aria-label", "Relevant, with severity");
-  const c = state.verdicts.get(id);
-  SEVERITIES.forEach((s, i) => { const b = button(s[0].toUpperCase(), () => stageAndRefresh(id, {verdict: "relevant", severity: s}),
-    {cls: "c-" + s, label: "Relevant, " + s, title: "Relevant, " + s + " (key " + (i + 1) + ")"});
-    b.setAttribute("aria-pressed", c && c.verdict === "relevant" && c.severity === s ? "true" : "false"); group.append(b); });
-  return group;
+// How many of the loaded alerts an exclusion applies to (a country hides an alert only when
+// every country the alert names is excluded).
+function impact(kind, value, list) {
+  const loaded = arr(list).filter(a => a && a.match_id);
+  if (!loaded.length) return "hides the alerts it matches from every view";
+  const hits = loaded.filter(a => kind === "channel" ? str(a.channel_id) === value : kind === "topic" ? arr(a.topics).includes(value)
+    : kind === "country" ? arr(a.countries).includes(value) : str(a.text || a.excerpt).toLowerCase().includes(value.toLowerCase())).length;
+  return "applies to " + hits + " of the " + plural(loaded.length, "loaded alert") + (kind === "country" ? " (each hidden only if every country it names is hidden)" : "");
 }
-function selectedCount() { const c = document.querySelector(".bulk .count-sel"); if (c) c.textContent = state.selection.size ? fmtNum(state.selection.size) + " selected" : "None selected"; }
-function stageAndRefresh(id, change) { stage(id, change); refreshCard(id); }
-// Replace one card in place, keeping the focus where it was.
-function refreshCard(id) {
-  document.querySelectorAll('.alert[data-match="' + CSS.escape(String(id)) + '"]').forEach(old => {
-    const had = old.contains(document.activeElement);
-    const fresh = alertCard(old._alert, old._opts); old.replaceWith(fresh); if (had) fresh.focus({preventScroll: true});
-  });
+async function hideLike(kind, value, label) {
+  if (!KINDS.includes(kind) || !value) return;
+  const out = await write("exclude", {kind: kind, value: value});
+  status("Hidden: " + kind + " " + str(label, 80) + " (" + exclusionOutcome(out) + "). Tuning lists it; removing it there shows the alerts again.");
+  state.expanded = null; await show(state.tab, false);
+}
+function exclusionOutcome(out) {
+  // one value answers {excluded: true}; several answer the lists
+  const added = out.excluded === true ? 1 : arr(out.excluded).length, already = arr(out.already).length, refused = arr(out.refused);
+  let t = added + " excluded";
+  if (already) t += ", " + already + " already excluded";
+  if (refused.length) t += "; " + refused.length + " refused: " + refused.slice(0, 5).map(r => str(r.value, 40) + " (" + str(r.reason, 80) + ")").join(", ");
+  return t;
 }
 function queueKeys(queue, list) {
-  queue.setAttribute("aria-keyshortcuts", "j k 1 2 3 4 x a z o Enter Space Escape");
+  queue.setAttribute("aria-keyshortcuts", "j k 1 2 3 4 x a z o Enter Space Escape ?");
   queue.addEventListener("keydown", ev => {
-    // A held key repeats and an input method composes: neither may stage a page of alerts.
+    // A held key repeats and an input method composes: neither may save a page of alerts.
     if (ev.altKey || ev.ctrlKey || ev.metaKey || ev.repeat || ev.isComposing) return;
     const t = ev.target; if (!t || ["INPUT", "SELECT", "TEXTAREA"].includes(t.tagName)) return;
     const row = t.closest(".alert"); if (!row || !queue.contains(row)) return;
     const id = row._alert.match_id; const k = ev.key;
     if (k === "j" || k === "k") { ev.preventDefault(); moveFrom(id, k === "j" ? 1 : -1); }
-    else if (SEV_KEYS[k]) { ev.preventDefault(); stage(id, {verdict: "relevant", severity: SEV_KEYS[k]}); afterKey(id); }
-    else if (k === "x") { ev.preventDefault(); stage(id, {verdict: "irrelevant"}); afterKey(id); }
-    else if (k === "a") { ev.preventDefault(); stageAck(id); afterKey(id); }
+    else if (SEV_KEYS[k]) { ev.preventDefault(); judgeOne(id, "relevant", SEV_KEYS[k]); afterKey(id); }
+    else if (k === "x") { ev.preventDefault(); judgeOne(id, "irrelevant"); afterKey(id); }
+    else if (k === "a") { ev.preventDefault(); acknowledge([id]); afterKey(id); }
     else if (k === "z") { ev.preventDefault(); undoLast(); }
+    else if (k === "?") { ev.preventDefault(); const p = $("panel").querySelector("details.keys"); if (p) p.open = !p.open; }
     else if ((k === "Enter" || k === " " || k === "o") && t === row) { ev.preventDefault(); toggleCard(id); }
+  });
+}
+// Replace one card in place, keeping the focus where it was.
+function refreshCard(id) {
+  document.querySelectorAll('.alert[data-match="' + CSS.escape(String(id)) + '"]').forEach(old => {
+    const had = old.contains(document.activeElement);
+    const fresh = alertCard(old._alert, old._opts); old.replaceWith(fresh); if (had) fresh.focus({preventScroll: true});
   });
 }
 function siblingCard(id, dir) {
@@ -1748,195 +2004,70 @@ function moveFrom(id, dir) {
   const target = cardEl(nid); if (!target) return;
   target.focus({preventScroll: true}); target.scrollIntoView({block: state.expanded === nid ? "start" : "nearest"}); resize();
 }
-// After a key: the card shows its change and the next card takes the focus (open, when reading).
+// After a key: the next card takes the focus (open, when reading); the saved card shows its state.
 function afterKey(id) {
-  if (siblingCard(id, 1)) { refreshCard(id); moveFrom(id, 1); }
-  else { refreshCard(id); const c = cardEl(id); if (c) c.focus({preventScroll: true}); }
+  if (siblingCard(id, 1)) moveFrom(id, 1);
+  else { const c = cardEl(id); if (c) c.focus({preventScroll: true}); }
 }
-function undoLast() {
-  while (state.history.length) {
-    const id = state.history.pop();
-    if (state.verdicts.has(id) || state.acks.has(id)) {
-      state.verdicts.delete(id); state.acks.delete(id); renderTray(); refreshCard(id);
-      status("Undone: " + alertName(id) + "."); return;
-    }
-  }
-  status("Nothing staged to undo.");
-}
+// The keys, in the "?" popover of the Alerts toolbar.
 function keysHint() {
-  const p = el("p", undefined, "keys-hint");
-  [["j", "/"], ["k", " move · "], ["Enter", " open or close · "], ["1", "–"], ["4", " relevant: critical to low · "], ["x", " irrelevant · "],
-   ["a", " acknowledge · "], ["z", " undo · "], ["Esc", " close"]]
-    .forEach(([k, after]) => { p.append(el("kbd", k), document.createTextNode(after)); });
-  return p;
+  const ul = el("ul", undefined, "keys-hint");
+  [[["j", "k"], "next, previous"], [["Enter"], "open or close the post"], [["1", "2", "3", "4"], "relevant: critical, high, medium, low"],
+   [["x"], "not relevant"], [["a"], "acknowledge"], [["z"], "undo the last verdict"], [["Esc"], "close"]]
+    .forEach(([keys, what]) => { const li = el("li"); const k = el("span", undefined, "k"); keys.forEach(x => k.append(el("kbd", x))); li.append(k, el("span", what)); ul.append(li); });
+  return ul;
 }
-function stage(id, change) {
-  const prev = state.verdicts.get(id) || {};
-  state.verdicts.set(id, Object.assign({}, prev, change)); state.history.push(id); renderTray();
-  status("Staged. Apply sends it to IntelMCP.");
-}
-// Each staging is a new object, so Apply can tell what it sent from what was staged again meanwhile.
-function stageAck(id) { state.acks.set(id, {}); state.history.push(id); renderTray(); status("Acknowledgement staged."); }
-// Staging an exclusion says how many of the alerts on screen it applies to (a country
-// hides an alert only when every country the alert names is excluded).
-function stageExclusion(kind, value, label, list) {
-  if (!KINDS.includes(kind) || !value) return;
-  const set = state.exclusions.get(kind) || new Map(); set.set(value, label || value); state.exclusions.set(kind, set);
-  const loaded = arr(list).filter(a => a && a.match_id);
-  const hits = loaded.filter(a => kind === "channel" ? str(a.channel_id) === value : kind === "topic" ? arr(a.topics).includes(value)
-    : kind === "country" ? arr(a.countries).includes(value) : str(a.excerpt).toLowerCase().includes(value.toLowerCase())).length;
-  renderTray(); status("Exclusion staged: " + kind + " " + str(label || value, 80) + (loaded.length ? "; it applies to " + hits + " of the "
-    + plural(loaded.length, "loaded alert") + (kind === "country" ? " (each hidden only if every country it names is excluded)" : "") : "") + ".");
-}
-function trayCount() { let n = state.verdicts.size + state.acks.size; state.exclusions.forEach(s => { n += s.size; }); return n; }
-// The matches one card stands for: its own and the other rules' matches of the same post.
-function cardMatches(id) {
-  const a = state.known.get(id); const ids = [id];
-  arr(a && a.also_matched).forEach(x => { if (x && Number.isInteger(x.match_id) && !ids.includes(x.match_id)) ids.push(x.match_id); });
-  return ids;
-}
-// Staged verdicts in record_verdict calls of at most 200 items, a card's matches never split.
-function verdictChunks() {
-  const chunks = []; let cur = [], n = 0;
-  state.verdicts.forEach((c, id) => { const ids = cardMatches(id);
-    if (cur.length && n + ids.length > VERDICT_ITEMS_PER_CALL) { chunks.push(cur); cur = []; n = 0; }
-    cur.push([id, c, ids]); n += ids.length; });
-  if (cur.length) chunks.push(cur);
-  return chunks;
-}
-function calls() {
-  return verdictChunks().length + (state.acks.size ? 1 : 0)
-    + Array.from(state.exclusions.values()).reduce((n, s) => n + Math.ceil(s.size / VALUES_PER_CALL), 0);
-}
-function alertName(id) {
-  const a = state.known.get(id);
-  return a ? str(a.channel, 50) + ", " + fmtTime(a.time) + ": " + str(a.excerpt, 60) : "an alert";
-}
-function renderTray() {
-  const n = trayCount();
-  $("trayToggle").textContent = "Changes: " + n; $("trayToggle").hidden = !n;   // nothing to show until something is staged
-  const apply = $("apply"), discard = $("discard");
-  apply.hidden = discard.hidden = !n;
-  apply.textContent = "Apply (" + plural(calls(), "tool call") + ")";
-  const tray = $("tray"); tray.replaceChildren();
-  if (!n) { tray.hidden = true; $("trayToggle").setAttribute("aria-expanded", "false"); resize(); return; }
-  tray.append(el("p", "Changes not applied are lost when the panel closes.", "meta"));
-  const list = el("ul");
-  const entry = (text, undo, label) => { const li = el("li"); li.append(textBlock("span", text + " "), button("Undo", undo, {label: label})); list.append(li); };
-  state.verdicts.forEach((c, id) => entry((c.verdict === "relevant" && c.severity ? "Relevant (" + c.severity + ")" : "Mark " + str(c.verdict)) + ": " + alertName(id),
-    () => { state.verdicts.delete(id); renderTray(); refreshCard(id); }, "Undo verdict: " + alertName(id)));
-  state.acks.forEach((_, id) => entry("Acknowledge: " + alertName(id), () => { state.acks.delete(id); renderTray(); refreshCard(id); }, "Undo acknowledgement: " + alertName(id)));
-  state.exclusions.forEach((set, kind) => set.forEach((label, v) => entry("Exclude " + kind + ": " + str(label, 80),
-    () => { set.delete(v); if (!set.size) state.exclusions.delete(kind); renderTray(); }, "Undo exclusion " + kind + " " + str(label, 40))));
-  tray.append(list);
-  syncWrites(); resize();
-}
-async function applyTray() {
-  const done = []; let failure = null; const touched = new Set();
-  try {
-    // A card's verdict covers every match of its post (the other rules' too), so the post
-    // reads the same in every rule's view; the outcome counts cards.
-    for (const chunk of verdictChunks()) {
-      const items = [];
-      chunk.forEach(([, c, ids]) => ids.forEach(id => items.push(compact({match_id: id, verdict: c.verdict,
-        severity: c.verdict === "relevant" ? c.severity : undefined, summary: c.summary, reason: c.reason}))));
-      const out = await write("record_verdict", {items: items});
-      // Only what was sent leaves the tray: a change staged again while Apply waited stays.
-      chunk.forEach(([id, c]) => { if (state.verdicts.get(id) === c) state.verdicts.delete(id); touched.add(id); });
-      const gone = new Set(arr(out.not_found));
-      const judged = chunk.length === items.length ? num(out.updated) : chunk.filter(([id]) => !gone.has(id)).length;
-      done.push(plural(judged, "alert") + " judged" + (num(out.repeats_updated) ? " (" + plural(out.repeats_updated, "repost") + " follow)" : "")
-        + (gone.size ? ", " + gone.size + " no longer exist" : ""));
-    }
-    if (state.acks.size) {
-      const sent = Array.from(state.acks.entries()); const ids = [];
-      sent.forEach(([id]) => cardMatches(id).forEach(mid => { if (!ids.includes(mid)) ids.push(mid); }));
-      const out = await write("ack_matches", {match_ids: ids});
-      sent.forEach(([id, token]) => { if (state.acks.get(id) === token) state.acks.delete(id); touched.add(id); });
-      done.push((ids.length === sent.length ? num(out.acknowledged) : sent.length) + " acknowledged");
-    }
-    for (const [kind, set] of Array.from(state.exclusions.entries())) {
-      const values = Array.from(set.keys());
-      for (let i = 0; i < values.length; i += VALUES_PER_CALL) {
-        const out = await write("exclude", {kind: kind, values: values.slice(i, i + VALUES_PER_CALL)});
-        values.slice(i, i + VALUES_PER_CALL).forEach(v => set.delete(v));
-        done.push(exclusionOutcome(out));
-      }
-      if (!set.size) state.exclusions.delete(kind);
-    }
-    state.selection.clear();
-    status("Applied: " + done.join("; ") + ".");
-  } catch (err) {
-    status(done.length ? "Applied in part: " + done.join("; ") + "." : "");
-    failure = err;
-  }
-  renderTray();
-  await show(state.tab, false);
-  if (failure) showError(failure);   // after the reload, which clears the error line
-  const next = $("panel").querySelector(".alert"); if (next) next.focus({preventScroll: true});
-}
-function exclusionOutcome(out) {
-  const added = arr(out.excluded).length, already = arr(out.already).length, refused = arr(out.refused);
-  let t = added + " excluded";
-  if (already) t += ", " + already + " already excluded";
-  if (refused.length) t += "; " + refused.length + " refused: " + refused.slice(0, 5).map(r => str(r.value, 40) + " (" + str(r.reason, 80) + ")").join(", ");
-  return t;
+function keysPopover() {
+  return menu("Keyboard shortcuts", [el("p", "Keys act on the card in focus, and each saves at once.", "meta"), keysHint()],
+    {text: "?", cls: "keys", title: "Keyboard shortcuts (?)"});
 }
 
 // ------------------------------------------------------------------ alerts
+const VERDICT_TABS = [["unreviewed", "To review"], ["relevant", "Relevant"], ["irrelevant", "Not relevant"], ["", "All"]];
+function filterCount(f) { return [f.min_severity, f.unacked_only, f.rule_id, f.channel_id, f.topic, f.since || f.until, f.include_excluded].filter(Boolean).length; }
 function renderAlerts(panel, d) {
   const f = state.filters;
   const items = arr(d.items); remember(items);
   const focusId = state.focusMatch; state.focusMatch = null;
   if (focusId !== null && focusId !== undefined && items.some(a => a.match_id === focusId)) state.expanded = focusId;
-  const qf = el("div", undefined, "qf"); qf.setAttribute("role", "toolbar"); qf.setAttribute("aria-label", "Quick filters");
-  const seg = el("span", undefined, "seg-ctl"); qf.append(seg);
-  const chip = (label, on, filter) => { const b = button(label, () => openAlerts(filter)); b.setAttribute("aria-pressed", on ? "true" : "false"); seg.append(b); };
-  const plain = !f.min_severity && !f.rule_id && !f.unacked_only && !f.channel_id && !f.topic && !f.since && !f.until;
-  chip("Unreviewed", f.verdict === "unreviewed" && plain, {verdict: "unreviewed"});
-  chip("High+", f.min_severity === "high", {verdict: "unreviewed", min_severity: "high"});
-  chip("Unacked", f.unacked_only, {unacked_only: true});
-  chip("All", !f.verdict && plain, {});
+  // The toolbar: which alerts (by verdict), one Filters button, the keys.
+  const qf = el("div", undefined, "qf");
+  const seg = el("div", undefined, "seg-ctl"); seg.setAttribute("role", "group"); seg.setAttribute("aria-label", "Which alerts");
+  VERDICT_TABS.forEach(([v, label]) => { const b = button(label, () => openAlerts(Object.assign({}, f, {verdict: v})));
+    b.setAttribute("aria-pressed", (f.verdict || "") === v ? "true" : "false"); seg.append(b); });
+  const n = filterCount(f);
+  const fb = button(n ? "Filters (" + n + ")" : "Filters", btn => { const box = $("alertFilters"); box.hidden = !box.hidden; state.alertFiltersOpen = !box.hidden;
+    btn.setAttribute("aria-expanded", box.hidden ? "false" : "true"); resize(); }, {icon: "filter", cls: n ? "on" : undefined});
+  fb.setAttribute("aria-expanded", state.alertFiltersOpen ? "true" : "false"); fb.setAttribute("aria-controls", "alertFilters");
+  qf.append(seg, fb, el("span", undefined, "grow"), keysPopover());
+  // The summary: how many, and the filters in force.
   const rules = (state.cache.rules && arr(state.cache.rules.rules)) || [];
-  const ruleOpts = [["", "By rule…"]].concat(rules.map(r => [str(r.rule_id), str(r.name, 60)]));
-  items.forEach(a => { if (!ruleOpts.some(o => o[0] === str(a.rule_id))) ruleOpts.push([str(a.rule_id), str(a.rule_name, 60)]); });
-  const rule = select(ruleOpts, f.rule_id); rule.setAttribute("aria-label", "Alerts of one rule");
-  qf.append(rule, button("Show rule", () => { if (rule.value) openAlerts({rule_id: rule.value}); }));
-  const hidden = input("checkbox", f.include_excluded);
-  qf.append(labelled(hidden, "Include hidden"), button("Apply filter", () => openAlerts(Object.assign({}, f, {include_excluded: hidden.checked}))));
   const active = [];
-  if (f.channel_id) active.push("channel " + str(f.channel_label || f.channel_id, 60));
-  if (f.topic) active.push("topic " + str(f.topic, 40));
-  if (f.rule_id) active.push("rule " + str((rules.find(r => str(r.rule_id) === str(f.rule_id)) || items.find(a => str(a.rule_id) === str(f.rule_id)) || {}).name
+  if (f.min_severity) active.push(f.min_severity === "high" ? "high or critical" : f.min_severity + " or higher");
+  if (f.unacked_only) active.push("not acknowledged");
+  if (f.rule_id) active.push("rule " + str((rules.find(r => str(r.rule_id) === str(f.rule_id)) || {}).name
     || (items.find(a => str(a.rule_id) === str(f.rule_id)) || {}).rule_name || f.rule_id, 60));
+  if (f.channel_id) active.push("channel " + str(f.channel_label || state.channels.get(str(f.channel_id)) || f.channel_id, 60));
+  if (f.topic) active.push("topic " + str(f.topic, 40));
   if (f.since || f.until) active.push(f.since === f.until ? "on " + f.since : "from " + (f.since || "start") + (f.until ? " to " + f.until : ""));
-  if (f.verdict) active.push(f.verdict); if (f.min_severity) active.push(f.min_severity + " or higher");
+  if (f.include_excluded) active.push("including hidden");
   // Later pages carry no total: the first page's stays.
   if (!state.cursor) state.alertsTotal = {total: d.total, capped: d.total_capped};
   const totals = state.alertsTotal || {total: d.total, capped: d.total_capped};
   const summary = el("p", plural(totals.total, "alert") + (totals.capped ? "+" : "") + (active.length ? " · " + active.join(" · ") : ""), "meta");
-  if (active.length) summary.append(" ", button("Clear filters", () => openAlerts({}), {cls: "link"}));
+  if (active.length) summary.append(" ", button("Clear filters", () => openAlerts({verdict: f.verdict}), {cls: "link"}));
   headMeta(panel, summary);
-  panel.append(qf);
+  panel.append(qf, alertFilters(f, items, rules));
   const queue = el("div", undefined, "queue");
   if (!items.length) {
-    if (f.verdict === "unreviewed" && plain && !state.cursor) queue.append(emptyState("All reviewed", "Nothing waits for a verdict. New alerts appear here as rules match new posts.", {good: true}));
+    const plainFilter = !n && !state.cursor;
+    if (f.verdict === "unreviewed" && plainFilter) queue.append(emptyState("All caught up", "Nothing waits for a verdict. New alerts appear here as rules match new posts.", {good: true}));
+    else if (f.verdict === "relevant" && plainFilter) queue.append(emptyState("Nothing marked relevant yet", "Alerts you mark relevant are listed here."));
+    else if (f.verdict === "irrelevant" && plainFilter) queue.append(emptyState("Nothing marked not relevant", "Alerts you mark not relevant are listed here."));
     else queue.append(emptyState("No alerts for this filter", "Other alerts may match a wider filter.",
-      {icon: "filter", actions: active.length ? [button("Clear filters", () => openAlerts({}))] : []}));
+      {icon: "filter", actions: n ? [button("Clear filters", () => openAlerts({verdict: f.verdict}))] : []}));
   } else {
-    const bar = el("div", undefined, "row box bulk"); bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Selected alerts");
-    const all = input("checkbox", items.every(a => state.selection.has(a.match_id)));
-    all.addEventListener("change", () => { items.forEach(a => all.checked ? state.selection.add(a.match_id) : state.selection.delete(a.match_id));
-      items.forEach(a => refreshCard(a.match_id)); selectedCount(); });
-    const bulkSev = select(SEVERITIES.map(s => [s, s]), "medium"); bulkSev.setAttribute("aria-label", "Severity for Relevant");
-    all.title = "Select all on this page";
-    const each = fn => () => { if (!state.selection.size) { status("Select alerts first."); return; } Array.from(state.selection).forEach(id => { fn(id); refreshCard(id); }); };
-    bar.append(labelled(all, "Select all on this page", true), el("span", state.selection.size ? fmtNum(state.selection.size) + " selected" : "None selected", "count-sel"), bulkSev,
-      button("Relevant", each(id => stage(id, {verdict: "relevant", severity: bulkSev.value}))),
-      button("Irrelevant", each(id => stage(id, {verdict: "irrelevant"}))),
-      button("Unreviewed", each(id => stage(id, {verdict: "unreviewed"}))),
-      button("Acknowledge", each(id => stageAck(id))));
-    queue.append(keysHint(), bar);
+    queue.append(bulkBar(items));
     queueKeys(queue, items);
     items.forEach(a => queue.append(alertCard(a, {list: items, select: true})));
   }
@@ -1945,30 +2076,89 @@ function renderAlerts(panel, d) {
   if (d.next_cursor) pager.append(button("Older", async () => { state.cursors.push(state.cursor); state.cursor = str(d.next_cursor); state.selection.clear(); delete state.cache.alerts; await show("alerts", false); }));
   queue.append(pager);
   panel.append(queue);
+  syncBulk();
   if (focusId !== null && focusId !== undefined) setTimeout(() => {
     const c = cardEl(focusId);
     if (c) { c.focus({preventScroll: true}); c.scrollIntoView({block: "start"}); } else status("That alert is not in this view any more.");
     resize(); }, 0);
 }
+// The filters behind the Filters button; each applies when it is changed (a read, never a write).
+function alertFilters(f, items, rules) {
+  const box = el("div", undefined, "filters alert-filters"); box.id = "alertFilters"; box.hidden = !state.alertFiltersOpen;
+  box.setAttribute("role", "group"); box.setAttribute("aria-label", "Filters");
+  const go = change => openAlerts(Object.assign({}, f, change));
+  const high = input("checkbox", f.min_severity === "high" || f.min_severity === "critical");
+  high.addEventListener("change", () => go({min_severity: high.checked ? "high" : ""}));
+  const unacked = input("checkbox", f.unacked_only); unacked.addEventListener("change", () => go({unacked_only: unacked.checked}));
+  const ruleOpts = [["", "Any rule"]].concat(rules.map(r => [str(r.rule_id), str(r.name, 60)]));
+  items.forEach(a => { if (a.rule_id && !ruleOpts.some(o => o[0] === str(a.rule_id))) ruleOpts.push([str(a.rule_id), str(a.rule_name, 60)]); });
+  if (f.rule_id && !ruleOpts.some(o => o[0] === str(f.rule_id))) ruleOpts.push([str(f.rule_id), "Rule " + str(f.rule_id)]);
+  const rule = select(ruleOpts, f.rule_id); rule.addEventListener("change", () => go({rule_id: rule.value}));
+  const topics = [];
+  [(state.cache.rules && arr(state.cache.rules.topics)) || [], (state.cache.tuning && arr(state.cache.tuning.topics)) || []]
+    .concat(items.map(a => arr(a.topics))).forEach(list => list.forEach(t => { if (typeof t === "string" && t && !topics.includes(t)) topics.push(t); }));
+  if (f.topic && !topics.includes(f.topic)) topics.push(f.topic);
+  const topic = select([["", "Any topic"]].concat(topics.slice(0, MAX_ROWS).map(t => [t, str(t, 60)])), f.topic);
+  topic.addEventListener("change", () => go({topic: topic.value}));
+  const chans = Array.from(state.channels.entries());
+  if (f.channel_id && !state.channels.has(str(f.channel_id))) chans.push([str(f.channel_id), str(f.channel_label || f.channel_id, 60)]);
+  const channel = select([["", "Any channel"]].concat(chans.map(([id, t]) => [id, str(t, 60)])), f.channel_id);
+  channel.addEventListener("change", () => go({channel_id: channel.value, channel_label: state.channels.get(channel.value) || ""}));
+  const since = input("date", f.since), until = input("date", f.until);
+  since.addEventListener("change", () => go({since: since.value})); until.addEventListener("change", () => go({until: until.value}));
+  const hidden = input("checkbox", f.include_excluded); hidden.addEventListener("change", () => go({include_excluded: hidden.checked}));
+  const checks = el("div", undefined, "checks");
+  checks.append(labelled(high, "High or critical only"), labelled(unacked, "Not acknowledged only"), labelled(hidden, "Include hidden alerts"));
+  box.append(checks, labelled(rule, "Rule"), labelled(topic, "Topic"), labelled(channel, "Channel"), labelled(since, "From"), labelled(until, "Until"));
+  if (filterCount(f)) box.append(button("Clear filters", () => openAlerts({verdict: f.verdict}), {cls: "link"}));
+  return box;
+}
+// The bulk bar: only while cards are ticked. Each action is one call for every ticked card.
+function bulkBar(items) {
+  const bar = el("div", undefined, "row box bulk"); bar.id = "bulkBar"; bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Selected alerts");
+  const all = input("checkbox", false); all.title = "Select all on this page";
+  all.addEventListener("change", () => { items.forEach(a => all.checked ? state.selection.add(a.match_id) : state.selection.delete(a.match_id));
+    items.forEach(a => refreshCard(a.match_id)); syncBulk(); });
+  const ids = () => Array.from(state.selection);
+  const split = relevantSplit(() => judge(ids(), (id, now) => ({verdict: "relevant", severity: sevOf(now.severity) || "medium"}), "relevant"),
+    s => judge(ids(), () => ({verdict: "relevant", severity: s}), "relevant · " + s), null,
+    "Mark the selected alerts relevant (each keeps its severity, else medium)");
+  bar.append(labelled(all, "Select all on this page", true), el("span", "", "count-sel"), split,
+    button("Not relevant", () => judge(ids(), () => ({verdict: "irrelevant", severity: null}), "not relevant"), {write: true}),
+    button("Acknowledge", () => acknowledge(ids()), {write: true}), el("span", undefined, "grow"),
+    button("", () => { const was = ids(); state.selection.clear(); was.forEach(refreshCard); syncBulk(); },
+      {cls: "quiet icon-only", icon: "x", label: "Clear selection", title: "Clear selection"}));
+  bar._items = items;
+  return bar;
+}
+function syncBulk() {
+  const bar = $("bulkBar"); if (!bar) return;
+  const n = state.selection.size; bar.hidden = !n;
+  bar.querySelector(".count-sel").textContent = fmtNum(n) + " selected";
+  const items = bar._items || [];
+  bar.querySelector("input[type=checkbox]").checked = items.length > 0 && items.every(a => state.selection.has(a.match_id));
+  resize();
+}
 
 // ------------------------------------------------------------------ the open card's forms and indicators
+// The summary and note save at once too, with the alert's verdict unchanged.
 function noteForm(a) {
-  const c = state.verdicts.get(a.match_id) || {};
   const det = el("details"); det.append(el("summary", "Summary and note"));
-  const summary = input("text", c.summary || a.summary || "", {maxLength: 1000});
-  const note = input("textarea", c.reason || a.reason || "");
+  const summary = input("text", a.summary || "", {maxLength: 1000});
+  const note = input("textarea", a.reason || "");
   det.append(labelled(summary, "Summary"), labelled(note, "Note"),
-    button("Stage summary and note", () => { const prev = state.verdicts.get(a.match_id) || {verdict: a.verdict || "relevant", severity: a.severity || undefined};
-      stage(a.match_id, compact(Object.assign({}, prev, {summary: summary.value.trim() || undefined, reason: note.value.trim() || undefined})));
-      refreshCard(a.match_id); }));
+    button("Save summary and note", () => judge([a.match_id], () => ({summary: summary.value.trim() || null, reason: note.value.trim() || null}),
+      "summary and note"), {write: true}));
   return det;
 }
-function phraseForm() {
+function phraseForm(list) {
   const box = el("div", undefined, "box");
   const phrase = input("text", "", {maxLength: 100});
-  box.append(labelled(phrase, "Exclude a phrase"),
-    button("Use selected text", () => { let t = ""; try { t = String(window.getSelection() || ""); } catch (e) { t = ""; } phrase.value = t.trim().slice(0, 100); }),
-    button("Stage phrase exclusion", () => { const p = phrase.value.trim(); if (p.length >= 3) stageExclusion("phrase", p); else status("A phrase is 3 to 100 characters."); }));
+  const hide = twoStep("Hide posts with this phrase", () => { const p = phrase.value.trim();
+    return p.length >= 3 && p.length <= 100 ? "Hide? It " + impact("phrase", p, list) + "." : "A phrase is 3 to 100 characters"; },
+    async () => { const p = phrase.value.trim(); if (p.length < 3) { status("A phrase is 3 to 100 characters."); return; } await hideLike("phrase", p, p); });
+  box.append(labelled(phrase, "Hide a phrase"),
+    button("Use selected text", () => { let t = ""; try { t = String(window.getSelection() || ""); } catch (e) { t = ""; } phrase.value = t.trim().slice(0, 100); }), hide);
   return box;
 }
 function indicatorRow(e, watchable) {
@@ -2052,6 +2242,7 @@ document.addEventListener("keydown", ev => {
 });
 document.addEventListener("focusin", ev => { const c = ev.target && ev.target.closest && ev.target.closest(".queue .alert"); if (c && c._alert) state.lastCard = c._alert.match_id; });
 document.addEventListener("keydown", ev => {
+  if (ev.defaultPrevented) return;   // Escape closed a menu first
   if (ev.key === "Escape" && state.expanded !== null && !["INPUT", "SELECT", "TEXTAREA"].includes((ev.target || {}).tagName)) { ev.preventDefault(); toggleCard(state.expanded); }
 });
 
@@ -2100,7 +2291,7 @@ function rulesTable(d, list, monitor, hl) {
     const b = button(label + (sort.key === k ? (sort.dir > 0 ? " ↑" : " ↓") : ""), () => {
       state.rulesSort = {key: k, dir: sort.key === k ? -sort.dir : (k === "name" ? 1 : -1)}; rerender(); }, {cls: "sort", label: "Sort by " + label});
     c.append(b); head.append(c); };
-  th("", null, false, "On"); th("Rule", "name"); th("Scope", null); th("Alerts " + state.days + "d", "alerts", true); th("Unreviewed", "unreviewed", true);
+  th("", null, false, "On"); th("Rule", "name"); th("Scope", null); th("Alerts " + state.days + "d", "alerts", true); th("To review", "unreviewed", true);
   th("Last hit", "last"); th("", null, false, "Actions");
   const thead = el("thead"); thead.append(head); const body = el("tbody");
   const flagged = arr(((state.cache.overview || {}).attention || {}).rules_noisy).filter(x => x && x.rule_id);
@@ -2130,8 +2321,8 @@ function rulesTable(d, list, monitor, hl) {
     alerts.append(count(r.alerts_in_window, plural(r.alerts_in_window, "alert") + " of " + name + " in " + state.days + " days", {rule_id: str(r.rule_id)}));
     if (noisy) { const z = lozenge(fmtNum(Math.round(rate)) + "/day", "attention", null, "badge plain");
       z.title = "Noisy: more than " + NOISY_PER_DAY + " alerts a day"; alerts.append(z); }
-    const unrev = el("td", undefined, "num c-unrev"); unrev.dataset.label = "Unreviewed";
-    unrev.append(count(r.unreviewed, plural(r.unreviewed, "unreviewed alert") + " of " + name, {rule_id: str(r.rule_id), verdict: "unreviewed"}));
+    const unrev = el("td", undefined, "num c-unrev"); unrev.dataset.label = "To review";
+    unrev.append(count(r.unreviewed, plural(r.unreviewed, "alert") + " to review of " + name, {rule_id: str(r.rule_id), verdict: "unreviewed"}));
     const last = el("td", r.last_hit_at ? relTime(r.last_hit_at) : "never", "when"); last.dataset.label = "Last hit";
     if (r.last_hit_at) last.title = "Last hit " + fmtTime(r.last_hit_at) + " · " + plural(r.hit_count, "hit") + " in total";
     const del = twoStep("Delete", "Delete rule and its " + plural(r.hit_count, "alert") + "?", async () => {
@@ -2343,7 +2534,7 @@ function renderDelivery(panel, d) {
   const lim = d.limit || {}; const monitor = d.monitor !== false;
   if (!state.cache.rules) load("rules", false).then(() => { if (state.tab === "delivery") rerender(); }).catch(() => {});
   headMeta(panel, (monitor ? fmtNum(lim.used) + " of " + plural(lim.max, "enabled destination") + ". "
-    : num(lim.used) ? plural(lim.used, "enabled destination") + ". " : "") + "Matches are pushed as they happen, unjudged, to webhooks you give.");
+    : num(lim.used) ? plural(lim.used, "enabled destination") + ". " : "") + "Matches are pushed as they happen, before any verdict, to webhooks you give.");
   const form = el("div", undefined, "box"); form.hidden = !state.addingWebhook;
   if (monitor) {
     const target = input("url", "", {maxLength: 2000, placeholder: "https://"});
@@ -2365,7 +2556,7 @@ function renderDelivery(panel, d) {
   const list = arr(d.deliveries); const hl = state.highlight && state.highlight.view === "delivery";
   if (!list.length && !monitor) panel.append(emptyState("No webhooks", "A webhook receives each new alert as a signed JSON event; alerts and webhooks are part of the Monitor plan. "
     + planLine(), {icon: "lock", actions: [siteLink("Plans and pricing")]}));
-  else if (!list.length) panel.append(emptyState("No webhook yet", "A webhook receives each new alert as a signed JSON event, unjudged, within seconds of the match.", {icon: "plus"}));
+  else if (!list.length) panel.append(emptyState("No webhook yet", "A webhook receives each new alert as a signed JSON event, before any verdict, within seconds of the match.", {icon: "plus"}));
   list.forEach(x => {
     const box = el("div", undefined, "dest"); const [hText, hClass] = health(x); const look = HEALTH_LOOK[hClass];
     const bad = hClass === "failing" || (!x.enabled && str(x.paused_reason) && !/by you/i.test(str(x.paused_reason)));
@@ -2630,14 +2821,10 @@ function renderAccount(panel, d) {
 
 // ------------------------------------------------------------------ start
 buildTabs();
+$("refresh").append(icon("refresh"));
 $("refresh").addEventListener("click", async () => { if (leavingSecret()) return; state.secret = null; state.cache = {}; await show(state.tab, false); });
 $("days").addEventListener("change", async () => { state.days = Number($("days").value) === 30 ? 30 : 7;
   ["overview", "rules", "tuning"].forEach(v => { delete state.cache[v]; }); await show(state.tab, false); });
-$("trayToggle").addEventListener("click", () => { const t = $("tray"); const open = t.hidden && trayCount() > 0;
-  t.hidden = !open; $("trayToggle").setAttribute("aria-expanded", open ? "true" : "false"); if (open) renderTray(); resize(); });
-$("apply").addEventListener("click", () => { applyTray().catch(showError); });
-$("discard").addEventListener("click", () => { const ids = new Set([...state.verdicts.keys(), ...state.acks.keys()]);
-  state.verdicts.clear(); state.acks.clear(); state.exclusions.clear(); renderTray(); ids.forEach(refreshCard); status("Changes discarded."); });
 $("expand").addEventListener("click", async () => {
   const mode = state.fullscreen ? "inline" : "fullscreen";
   try { const r = await request("ui/request-display-mode", {mode: mode}, READ_TIMEOUT);
@@ -2655,8 +2842,8 @@ selectTab("overview", false);
     state.openLinks = !!caps.openLinks; state.initialized = true;
     send({jsonrpc: "2.0", method: "ui/notifications/initialized", params: {}});
     onHostContext(res && res.hostContext);
-    // The host sends the model's show_dashboard result; without one, the view loads itself.
-    if (state.tab !== "search" && !state.cache[state.tab]) show(state.tab, false);
+    // The host sends the model's show_dashboard result; without one (no view loaded yet), the view loads itself.
+    if (state.tab !== "search" && !state.updatedAt) show(state.tab, false);
   } catch (err) { clearTimeout(notice); $("panel").replaceChildren(el("h2", "IntelMCP"), el("p", "This panel runs inside Claude.")); }
   resize();
 })();
