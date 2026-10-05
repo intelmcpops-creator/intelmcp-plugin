@@ -2,7 +2,7 @@
   "name": "intelmcp",
   "displayName": "IntelMCP",
   "description": "Threat intelligence from public Telegram channels, searchable and monitored inside Claude. Includes a setup interview (/intelmcp:setup), a dashboard (/intelmcp:dashboard), match triage (/intelmcp:triage), investigations (/intelmcp:investigate) and your own live command centre page (/intelmcp:command-centre). Requires an IntelMCP subscription from intelmcp.io.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {"name": "IntelMCP", "url": "https://intelmcp.io"},
   "homepage": "https://intelmcp.io",
   "repository": "https://github.com/intelmcpops-creator/intelmcp-plugin",
