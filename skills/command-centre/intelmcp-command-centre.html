@@ -50,6 +50,8 @@
     --tint: 10%;
 }
 * { box-sizing: border-box; }
+/* hidden always hides, whatever display a rule gives the element (button is inline-flex). */
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; }
 body { overflow: hidden; font: var(--fs-body); color: var(--fg); background: var(--bg); }
 #app { display: flex; flex-direction: column; height: 100vh; }
@@ -128,6 +130,10 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
   background: var(--surface); color: var(--fg); border: 1px solid var(--line-strong); border-inline-start: 3px solid var(--ok);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .28); font: var(--fs-body); }
 .toast[hidden] { display: none; }
+/* On a phone the toast sits at the bottom of the view, clear of the tabs, counts and toolbar. */
+@media (max-width: 640px) {
+  .toast { position: fixed; top: auto; bottom: max(var(--s2), env(safe-area-inset-bottom)); inset-inline: var(--s2); max-width: none; }
+}
 .toast > svg.ic { color: var(--ok); }
 .toast .msg { min-width: 0; overflow-wrap: anywhere; }
 .toast button.undo { min-height: 28px; padding: 2px var(--s3); font-weight: 600; color: var(--accent); border-color: var(--accent); background: none; }
@@ -394,6 +400,8 @@ i.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; fl
 .actions .cardmenu > summary { border-color: var(--line-strong); }
 .indicator { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 3px 0; }
 .indicator code { flex: 1; min-width: 160px; }
+/* Watch, Search and Copy stay together on one line; the group wraps as a whole. */
+.indicator .iacts { display: inline-flex; flex: none; gap: 4px; flex-wrap: nowrap; margin-inline-start: auto; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border: 1px solid var(--line-strong); border-radius: 999px; padding: 2px var(--s1) 2px 10px; display: inline-flex; gap: 6px; align-items: center;
   background: var(--surface); }
@@ -697,6 +705,9 @@ const SEV_CLASSES = new Set([...SEVERITIES, "unjudged", "irrelevant"]);
 // One vocabulary for verdicts: To review, Relevant, Not relevant (the classes keep the server's words).
 const SEV_WORDS = {unjudged: "to review", irrelevant: "not relevant"};
 function sevWord(k) { return SEV_WORDS[k] || k; }
+// The overview chart counts by severity: an alert without one is "no severity" there (To review counts verdicts).
+const CHART_WORDS = {unjudged: "no severity", irrelevant: "not relevant"};
+function chartWord(k) { return CHART_WORDS[k] || k; }
 // The last time this browser opened the page, where the page can remember it (the artifact):
 // alerts matched since then are marked new. The MCP App keeps nothing, so it marks nothing.
 const LAST_VISIT = typeof ARTIFACT_LAST_VISIT === "string" && isFinite(Date.parse(ARTIFACT_LAST_VISIT)) ? Date.parse(ARTIFACT_LAST_VISIT) : null;
@@ -1548,9 +1559,9 @@ function chart(perDay, window) {
   if (days.length) { labels.append(el("span", days[0]), el("span", days[Math.floor((days.length - 1) / 2)] || ""), el("span", days[days.length - 1])); }
   const legend = el("div", undefined, "legend");
   keys.forEach(s => { const n = days.reduce((t, k) => t + (byDay[k][s] || 0), 0); const sp = el("span"); const i = el("i", undefined, "s-" + s);
-    sp.append(i, document.createTextNode(sevWord(s) + " "), el("b", fmtNum(n))); legend.append(sp); });
+    sp.append(i, document.createTextNode(chartWord(s) + " "), el("b", fmtNum(n))); legend.append(sp); });
   const table = el("table", undefined, "vh"); const head = el("tr"); head.append(el("th", "Day"));
-  keys.forEach(s => head.append(el("th", sevWord(s)))); table.append(head);
+  keys.forEach(s => head.append(el("th", chartWord(s)))); table.append(head);
   days.forEach(k => { const tr = el("tr"); tr.append(el("td", k)); keys.forEach(s => tr.append(el("td", byDay[k][s] || 0))); table.append(tr); });
   wrap.append(box, labels, legend, table);
   return wrap;
@@ -2183,14 +2194,16 @@ function indicatorRow(e, watchable) {
   li.append(lozenge(type, "neutral", null, "badge"));
   if (e.role) li.append(lozenge(str(e.role, 20), "info", null, "badge"));
   li.append(el("code", shown));
+  const acts = el("span", undefined, "iacts");   // Watch, Search and Copy, kept on one line
   if (watchable && ENTITY_TYPES.includes(type)) {
     const w = button("Watch", b => watch(type, raw, li, b), {label: "Watch " + type + " " + str(shown, 60) + " with a rule",
       icon: hasMonitor() ? undefined : "lock", title: hasMonitor() ? undefined : "Rules are part of the Monitor plan"});
     if (!hasMonitor()) w.setAttribute("aria-expanded", "false");
-    li.append(w);
+    acts.append(w);
   }
-  li.append(button("Search", () => runSearchFor(raw), {label: "Search for " + str(shown, 60)}),
+  acts.append(button("Search", () => runSearchFor(raw), {label: "Search for " + str(shown, 60)}),
     button("Copy", () => copyText(shown, li), {label: "Copy " + str(shown, 60) + " (defanged)"}));
+  li.append(acts);
   return li;
 }
 // A clipboard that refuses, or never answers (some frames leave the request pending), falls
