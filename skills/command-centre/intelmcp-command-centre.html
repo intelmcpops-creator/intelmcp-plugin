@@ -589,7 +589,7 @@ td.when { white-space: nowrap; }
 and settings, and the collection your plan includes. The first time, Claude asks whether the page may use IntelMCP.
 It changes or deletes something only when you press a button or key; deleting and rotating a secret ask you to confirm. A verdict, an acknowledgement or a hidden
 channel, country, topic or phrase is saved when you press it, in one call; Undo (or the z key) puts back the last
-verdict. Hiding alerts asks you once more first. Webhook secrets are shown here once: copy them
+verdict or acknowledgement. Hiding alerts asks you once more first. Webhook secrets are shown here once: copy them
 before you leave the page. Times are in UTC.</p></details>
 </div>
 </div>
@@ -1152,7 +1152,7 @@ const state = {tab: "overview", days: 7, cache: {}, openLinks: false, initialize
   messages: new Map(), msgErrors: new Map(), loadingRefs: new Set(),   // get_message answers by message_ref
   saving: new Set(),     // cards whose save waits for an answer
   cardErrors: new Map(), // match_id -> why its last save did not go through
-  lastSave: null,        // what Undo (z) puts back: {kind: "verdict", before: Map(id -> judgment)} or {kind: "ack"}
+  lastSave: null,        // what Undo (z) puts back: {kind: "verdict", before, after: Map(id -> judgment)} or {kind: "ack", ids, mids}
   alertFiltersOpen: false,
   plan: null,            // {name, monitor} from the first view; unknown counts as Monitor
   monitorLimits: null,   // what Monitor allows (show_dashboard's monitor_limits)
@@ -1169,7 +1169,8 @@ function viewArgs(view) {
       min_severity: f.min_severity || undefined, rule_id: f.rule_id ? Number(f.rule_id) : undefined,
       unacked_only: f.unacked_only || undefined, include_excluded: f.include_excluded || undefined,
       channel_id: f.channel_id ? Number(f.channel_id) : undefined, topic: f.topic || undefined,
-      since: f.since || undefined, until: f.until || undefined, cursor: state.cursor || undefined, post_text: true});
+      since: f.since || undefined, until: f.until || undefined, cursor: state.cursor || undefined, post_text: true,
+      sort: f.verdict === "relevant" ? "severity" : undefined});   // Relevant: the most severe first
   }
   // The panel shows the post in each alert card; a call without post_text carries only excerpts.
   return view === "overview" ? {days: state.days, view: view, post_text: true} : {days: state.days, view: view};
@@ -1260,7 +1261,7 @@ function monitorAdds() {
     ["Tuning", (n("watch_profiles", "watch profiles") || "Watch profiles") + " for triage, and exclusions by topic, country, channel or phrase."],
     ["Delivery", "Signed JSON webhooks" + (l && l.deliveries ? ": up to " + plural(l.deliveries, "webhook destination") : "") + ", sent as alerts happen."],
     ["Overview", "Counts, alerts per day and what needs attention, over 7 or 30 days."]];
-  if (l && l.channel_requests_per_month) items.push(["Sources", "Up to " + fmtNum(l.channel_requests_per_month) + " channel requests a month, each reviewed by hand."]);
+  if (l && l.channel_requests_per_month) items.push(["Sources", "Up to " + fmtNum(l.channel_requests_per_month) + " channel requests a month, each vetted before a collection account joins the channel."]);
   const ul = el("ul", undefined, "adds");
   items.forEach(([name, text]) => { const li = el("li"); li.append(el("b", name), el("span", text)); ul.append(li); });
   return ul;
@@ -1573,8 +1574,13 @@ function cardMatches(id) {
   arr(a && a.also_matched).forEach(x => { if (x && Number.isInteger(x.match_id) && !ids.includes(x.match_id)) ids.push(x.match_id); });
   return ids;
 }
-function verdictItem(id, c) {
-  return compact({match_id: id, verdict: c.verdict, severity: c.verdict === "relevant" ? c.severity : undefined, summary: c.summary, reason: c.reason});
+// A summary or note goes with a verdict only when it changes from was ("" clears it): left
+// out, IntelMCP keeps the one it has, so a verdict never overwrites a newer note.
+const NOTE_FIELDS = ["summary", "reason"];
+function verdictItem(id, c, was) {
+  const item = compact({match_id: id, verdict: c.verdict, severity: c.verdict === "relevant" ? c.severity : undefined});
+  NOTE_FIELDS.forEach(k => { if (was ? (c[k] || null) !== (was[k] || null) : !!c[k]) item[k] = c[k] || ""; });
+  return item;
 }
 // Cards in calls of at most 200 matches, a card's matches never split (a page is one call).
 function chunked(entries) {
@@ -1602,11 +1608,12 @@ function saveFailed(ids, err) {
   showError(err);
 }
 // Sends judgments (Map id -> judgment), one record_verdict per 200 matches; each card changes once its call is answered.
-async function sendVerdicts(judgments) {
+// was (Map id -> judgment) is what the cards carried, so only a summary or note that changes is sent.
+async function sendVerdicts(judgments, was) {
   const chunks = chunked(Array.from(judgments.entries()));
   for (let i = 0; i < chunks.length; i++) {
     const items = [];
-    chunks[i].forEach(([id, c]) => cardMatches(id).forEach(mid => { if (!items.some(x => x.match_id === mid)) items.push(verdictItem(mid, c)); }));
+    chunks[i].forEach(([id, c]) => cardMatches(id).forEach(mid => { if (!items.some(x => x.match_id === mid)) items.push(verdictItem(mid, c, was.get(id))); }));
     try { await write("record_verdict", {items: items}); }
     catch (err) { saveFailed(chunks.slice(i).flat().map(e => e[0]), err); return false; }
     chunks[i].forEach(([id, c]) => { setAlert(id, {verdict: c.verdict, severity: c.severity, summary: c.summary, reason: c.reason});
@@ -1623,8 +1630,8 @@ function judge(ids, changeFor, label) {
   return queued(async () => {
     const before = new Map(list.map(id => [id, judgment(alertOf(id))]));
     const after = new Map(list.map(id => [id, Object.assign({}, before.get(id), changeFor(id, before.get(id)))]));
-    if (!await sendVerdicts(after)) return false;
-    state.lastSave = {kind: "verdict", before: before};
+    if (!await sendVerdicts(after, before)) return false;
+    state.lastSave = {kind: "verdict", before: before, after: after};
     // One alert marked not relevant: the toast also offers to hide alerts like it.
     const fewer = list.length === 1 && after.get(list[0]).verdict === "irrelevant" && before.get(list[0]).verdict !== "irrelevant"
       ? {label: "Fewer like this?", title: "Hide alerts like this one: a channel, country, topic or phrase", fn: () => openTune(list[0])} : null;
@@ -1636,24 +1643,24 @@ function judgeOne(id, verdict, severity) {
   const c = {verdict: verdict, severity: verdict === "relevant" ? severity : null};
   return judge([id], () => c, verdictWords(c));
 }
-// Undo (the toast's button or z): the last verdict back as it was, in one call.
+// Undo (the toast's button or z): the last verdict or acknowledgement back as it was, in one call.
 function undoLast() {
   const last = state.lastSave;
   if (!last) { status("Nothing to undo."); return; }
-  if (last.kind === "ack") { status("An acknowledgement cannot be undone here."); return; }
   const t = $("toast"), hadFocus = t.contains(document.activeElement);
   state.lastSave = null; hideToast();
-  const ids = Array.from(last.before.keys());
+  const ids = last.kind === "ack" ? last.ids : Array.from(last.before.keys());
   waiting(ids);
   if (hadFocus) { const c = cardEl(ids[0]); if (c) c.focus({preventScroll: true}); }
+  if (last.kind === "ack") { queued(() => unacknowledge(last)); return; }
   queued(async () => {
-    if (!await sendVerdicts(last.before)) { state.lastSave = last; return; }
+    if (!await sendVerdicts(last.before, last.after)) { state.lastSave = last; return; }
     const was = last.before.get(ids[0]);
     toast("Undone: " + (ids.length > 1 ? plural(ids.length, "alert") + " back as they were" : was.verdict === "unreviewed" ? "back in To review"
       : "back to " + verdictWords(was)) + ".", false);
   });
 }
-// Acknowledge: one ack_matches for every match of the cards. It cannot be taken back here.
+// Acknowledge: one ack_matches for every match of the cards; Undo takes it back in one call.
 function acknowledge(ids) {
   const list = ids.filter(id => { const a = alertOf(id); return a && !a.acked; });
   if (!list.length) { status(ids.length > 1 ? "Those alerts are acknowledged already." : "Already acknowledged."); return Promise.resolve(false); }
@@ -1663,10 +1670,18 @@ function acknowledge(ids) {
     try { await write("ack_matches", {match_ids: mids}); } catch (err) { saveFailed(list, err); return false; }
     list.forEach(id => { setAlert(id, {acked: true}); state.saving.delete(id); refreshCard(id); });
     clearError();
-    state.lastSave = {kind: "ack"};
-    toast("Acknowledged" + (list.length > 1 ? ": " + plural(list.length, "alert") : "") + ".", false);
+    state.lastSave = {kind: "ack", ids: list, mids: mids};
+    toast("Acknowledged" + (list.length > 1 ? ": " + plural(list.length, "alert") : "") + ".", true);
     return true;
   });
+}
+async function unacknowledge(last) {
+  try { await write("ack_matches", {match_ids: last.mids, acknowledged: false}); }
+  catch (err) { saveFailed(last.ids, err); state.lastSave = last; return false; }
+  last.ids.forEach(id => { setAlert(id, {acked: false}); state.saving.delete(id); refreshCard(id); });
+  clearError();
+  toast("Undone: " + (last.ids.length > 1 ? plural(last.ids.length, "alert") + " no longer acknowledged" : "no longer acknowledged") + ".", false);
+  return true;
 }
 // What was saved, under the header for a few seconds (longer while the pointer or focus is on it), with Undo.
 let toastTimer = null;
@@ -2668,13 +2683,14 @@ function renderSources(panel, d) {
   const left = el("p", plural(d.requests_left, "request") + " left this month" + (d.requests_reset_at ? " · resets " + fmtDate(d.requests_reset_at) : "") + ".", "meta");
   panel.append(el("h3", "Your channel requests"), left);
   const reqs = arr(d.requests);
-  if (!reqs.length) panel.append(el("p", "No requests yet: a request asks the operator to add a public channel; each is vetted by hand.", "meta"));
+  if (!reqs.length) panel.append(el("p", "No requests yet: a request asks the operator to add a public channel; each is vetted before a collection account joins the channel.", "meta"));
   else { const wrap = el("div", undefined, "tablewrap"); const t = el("table"); const h = el("tr");
     ["Channel", "Status", "Requested", "Answered"].forEach(x => { const th = el("th", x); th.scope = "col"; h.append(th); });
     const thead = el("thead"); thead.append(h); const body = el("tbody");
     const LOOK = {added: ["ok", "check"], pending: ["attention", "clock"], declined: ["neutral", "x"]};
     reqs.forEach(r => { const tr = el("tr"); const st = el("td"); const lk = LOOK[str(r.status)] || ["neutral", null];
       st.append(lozenge(str(r.status, 30), lk[0], lk[1]));
+      if (str(r.note)) st.append(textBlock("div", str(r.note, 200), "note meta"));   // the request's outcome, as text
       const ago = iso => { const td = el("td", undefined, "when"); if (iso) { const sp = el("span", relTime(iso), "time"); sp.title = fmtTime(iso); td.append(sp); } return td; };
       tr.append(textBlock("td", str(r.handle, 80)), st, ago(r.created_at), ago(r.resolved_at)); body.append(tr); });
     t.append(thead, body); wrap.append(t); panel.append(wrap); }
