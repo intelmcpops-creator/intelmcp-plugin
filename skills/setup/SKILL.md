@@ -87,7 +87,7 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
    - how many matches the last 7 days produced for each rule (backfilled in each add_rule result);
    - list_matches with rule_id and limit=3 for each new rule; merge the entries sorted by posted date,
      newest first (the message's posted_at), and show the newest 3-5: a one-line title, channel, date
-     and link;
+     and link (an entry with private: true has no link: say "Private channel" instead);
    - offer to judge them now against the profile. On yes, follow the triage steps below.
    On no: ask what to change, adjust, and show the summary again.
 8. Close in two or three lines: matches wait in IntelMCP until they ask (set_delivery can push them to
@@ -133,7 +133,8 @@ T4. Continue with list_matches, verdict="unreviewed" and cursor set to next_curs
     remain unreviewed, and offer to continue.
 T5. End with a short summary: how many matches were judged; the relevant ones by severity (critical,
     high, medium, low); the top items, highest severity first, each with its one-line summary,
-    channel, date and link; how many were irrelevant and the usual reason. If one rule produced
+    channel, date and link (an entry with private: true has no link: say "Private channel" instead); how
+    many were irrelevant and the usual reason. If one rule produced
     mostly irrelevant matches, name it and offer to narrow it (preview_rule a tighter version, then
     update_rule once the analyst agrees).
 

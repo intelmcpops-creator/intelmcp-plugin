@@ -35,7 +35,8 @@ T4. Continue with list_matches, verdict="unreviewed" and cursor set to next_curs
     remain unreviewed, and offer to continue.
 T5. End with a short summary: how many matches were judged; the relevant ones by severity (critical,
     high, medium, low); the top items, highest severity first, each with its one-line summary,
-    channel, date and link; how many were irrelevant and the usual reason. If one rule produced
+    channel, date and link (an entry with private: true has no link: say "Private channel" instead); how
+    many were irrelevant and the usual reason. If one rule produced
     mostly irrelevant matches, name it and offer to narrow it (preview_rule a tighter version, then
     update_rule once the analyst agrees).
 

@@ -48,7 +48,8 @@ Build the analyst's IntelMCP dashboard: one visual page of their monitoring.
      that have a role, and do not count them as victim domains;
    - a rules table: matches in the window, total hits, last hit, and a "never fired" flag;
    - the sources producing the most matches;
-   - the latest high-severity matches: time, channel, a one-line summary and a link to the post;
+   - the latest high-severity matches: time, channel, a one-line summary and a link to the post (a match with
+     private: true has no link: show "Private channel" instead);
    - deliveries (status and last result) and one account line (plan and usage).
    The page only reads; under it, say that the analyst can ask you to change rules, exclusions or
    deliveries.
