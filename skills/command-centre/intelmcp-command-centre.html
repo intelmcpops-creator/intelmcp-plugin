@@ -604,7 +604,7 @@ before you leave the page. Times are in UTC.</p></details>
 // dashboard_artifact.py puts it before panel.js and routes panel.js's send() here.
 const ARTIFACT_SERVER = "IntelMCP";
 // The tools the panel only reads (filled in by dashboard_artifact.py); every other call is a change.
-const ARTIFACT_READS = new Set(["check_source", "get_context", "get_message", "preview_rule", "search_messages", "show_dashboard", "trace_forwards"]);
+const ARTIFACT_READS = new Set(["check_source", "get_context", "get_message", "post_images", "preview_rule", "search_messages", "show_dashboard", "trace_forwards"]);
 // The last time this browser opened the page (kept in this browser only): panel.js marks the
 // alerts matched since then as new. This visit is remembered for the next one.
 const ARTIFACT_LAST_VISIT = (function () {

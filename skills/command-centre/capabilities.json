@@ -12,6 +12,7 @@
           "exclude",
           "get_context",
           "get_message",
+          "post_images",
           "preview_rule",
           "record_verdict",
           "remove_exclusion",
