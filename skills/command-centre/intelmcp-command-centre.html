@@ -339,6 +339,10 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line-st
 .actions button.close { margin-inline-start: auto; }
 /* Judged out of the tab it is listed under: quieter until the next load. */
 .alert.judged > :not(.head):not(.cardfoot):not(.actions) { opacity: .55; }
+/* A judged card leaving the tab: it collapses, then is removed (no motion when reduced). */
+.alert.leaving { overflow: hidden; pointer-events: none; }
+.alert.leaving-now { max-height: 0 !important; opacity: 0; padding-block: 0; margin-block: 0; border-width: 0;
+  transition: max-height .15s ease, opacity .12s ease, padding .15s ease, margin .15s ease, border-width .15s ease; }
 .alert[aria-busy="true"] .actions button:not(:disabled) { cursor: progress; }
 .card-note, .card-error { margin: 0; font: var(--fs-meta); flex-basis: 100%; }
 .alert > .card-note, .alert > .card-error { margin: var(--s1) 0 0; }
@@ -1645,9 +1649,89 @@ function saveFailed(ids, err) {
   ids.forEach(id => { state.saving.delete(id); state.cardErrors.set(id, msg); refreshCard(id); });
   showError(err);
 }
+// ------------------------------------------------------------------ a judged card leaves the tab it no longer belongs to
+// In To review, Relevant or Not relevant a saved card whose verdict is no longer the tab's collapses away
+// (All keeps every card). Undo puts it back where it was while the list is still the one it left.
+let alertsDraw = 0;   // counts the drawings of the queue: a card goes back only into the drawing it left
+const LEAVE_MS = 160;
+function belongsHere(a) { const v = state.filters.verdict; return !v || a.verdict === v; }
+function reducedMotion() { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); }
+function livingAfter(n, dir, skip) {
+  do { n = dir > 0 ? n.nextElementSibling : n.previousElementSibling; }
+  while (n && (!n.classList.contains("alert") || n.classList.contains("leaving") || skip.has(n)));
+  return n;
+}
+// The "N alerts" in the summary follows the cards that leave and come back.
+function shiftTotal(delta) {
+  const cache = state.cache.alerts;
+  [state.alertsTotal, cache].forEach(t => { if (t && typeof t.total === "number") t.total = Math.max(0, t.total + delta); });
+  const t = state.alertsTotal, span = document.querySelector("#panel .alerts-count");
+  if (t && span) span.textContent = plural(t.total, "alert") + (t.capped ? "+" : "");
+}
+function takeOut(c, skip) {
+  const id = c._alert.match_id, next = livingAfter(c, 1, skip);
+  const rec = {id: id, alert: c._alert, opts: c._opts, nextId: next ? next._alert.match_id : null, cacheAt: -1, cache: state.cache.alerts || null};
+  if (rec.cache && Array.isArray(rec.cache.items)) {
+    rec.cacheAt = rec.cache.items.findIndex(x => x && x.match_id === id);
+    if (rec.cacheAt >= 0) rec.cache.items.splice(rec.cacheAt, 1);
+  }
+  state.selection.delete(id); state.saving.delete(id);
+  if (state.expanded === id) state.expanded = null;
+  c.removeAttribute("data-match"); c.setAttribute("aria-hidden", "true"); c.classList.add("leaving");
+  if (reducedMotion()) c.remove();
+  else { c.style.maxHeight = c.offsetHeight + "px"; void c.offsetHeight; c.classList.add("leaving-now"); setTimeout(() => c.remove(), LEAVE_MS); }
+  return rec;
+}
+function settle(ids, out) {
+  const gone = [];
+  ids.forEach(id => {
+    const c = cardEl(id);
+    if (out && c && c._opts && c._opts.select && c.closest(".queue") && !belongsHere(c._alert)) gone.push(c); else refreshCard(id);
+  });
+  if (!gone.length) return;
+  const skip = new Set(gone), held = gone.find(c => c.contains(document.activeElement));
+  // Focus that sat on a removed card, on the bulk bar (it hides) or on nothing goes to the nearest card left.
+  const bar = $("bulkBar"), a = document.activeElement;
+  const lost = !held && (!a || a === document.body || (bar && bar.contains(a)) || (a.tagName === "H2" && $("panel").contains(a)));
+  let target = null;
+  const from = held || (lost ? gone[0] : null);
+  if (from) { target = livingAfter(from, 1, skip) || livingAfter(from, -1, skip); }
+  gone.forEach(c => out.push(takeOut(c, skip)));
+  shiftTotal(-gone.length);
+  if (target) target.focus({preventScroll: true});
+  syncBulk();
+  if (!document.querySelector("#panel .queue .alert:not(.leaving)")) {
+    // The page emptied: the first page of this tab is loaded again, so the empty view shows only when
+    // nothing is left, and Undo (the list is no longer the one the cards left) reloads too.
+    alertsDraw++;
+    state.cursor = null; state.cursors = []; state.selection.clear(); delete state.cache.alerts;
+    show("alerts", !!(held || lost));
+    return;
+  }
+  resize();
+}
+// Undo of a save that took cards out: back in the same places, or, once the list was drawn again, a fresh load.
+function putBack(last) {
+  const recs = arr(last.removed); if (!recs.length) return;
+  const queue = document.querySelector("#panel .queue");
+  if (last.draw !== alertsDraw || state.tab !== "alerts" || !queue) {
+    delete state.cache.alerts;
+    if (state.tab === "alerts") show("alerts", false);
+    return;
+  }
+  recs.slice().reverse().forEach(rec => {
+    const ref = rec.nextId !== null ? cardEl(rec.nextId) : queue.lastElementChild;   // the pager closes the queue
+    const card = alertCard(rec.alert, rec.opts);
+    if (ref && ref.parentNode === queue) queue.insertBefore(card, ref); else queue.append(card);
+    if (rec.cache && rec.cache === state.cache.alerts && rec.cacheAt >= 0 && !rec.cache.items.some(x => x && x.match_id === rec.id))
+      rec.cache.items.splice(Math.min(rec.cacheAt, rec.cache.items.length), 0, rec.alert);
+  });
+  shiftTotal(recs.length); syncBulk(); resize();
+}
 // Sends judgments (Map id -> judgment), one record_verdict per 200 matches; each card changes once its call is answered.
 // was (Map id -> judgment) is what the cards carried, so only a summary or note that changes is sent.
-async function sendVerdicts(judgments, was) {
+// out (an array) is given by a save that may take cards out of the list: it receives what was taken out, for Undo.
+async function sendVerdicts(judgments, was, out) {
   const chunks = chunked(Array.from(judgments.entries()));
   for (let i = 0; i < chunks.length; i++) {
     const items = [];
@@ -1655,7 +1739,8 @@ async function sendVerdicts(judgments, was) {
     try { await write("record_verdict", {items: items}); }
     catch (err) { saveFailed(chunks.slice(i).flat().map(e => e[0]), err); return false; }
     chunks[i].forEach(([id, c]) => { setAlert(id, {verdict: c.verdict, severity: c.severity, summary: c.summary, reason: c.reason});
-      state.saving.delete(id); state.cardErrors.delete(id); refreshCard(id); });
+      state.saving.delete(id); state.cardErrors.delete(id); });
+    settle(chunks[i].map(e => e[0]), out);
   }
   clearError();
   return true;
@@ -1668,8 +1753,9 @@ function judge(ids, changeFor, label) {
   return queued(async () => {
     const before = new Map(list.map(id => [id, judgment(alertOf(id))]));
     const after = new Map(list.map(id => [id, Object.assign({}, before.get(id), changeFor(id, before.get(id)))]));
-    if (!await sendVerdicts(after, before)) return false;
-    state.lastSave = {kind: "verdict", before: before, after: after};
+    const removed = [], draw = alertsDraw;   // the drawing the cards leave: an emptied page reloads and changes it
+    if (!await sendVerdicts(after, before, removed)) return false;
+    state.lastSave = {kind: "verdict", before: before, after: after, removed: removed, draw: draw};
     // One alert marked not relevant: the toast also offers to hide alerts like it.
     const fewer = list.length === 1 && after.get(list[0]).verdict === "irrelevant" && before.get(list[0]).verdict !== "irrelevant"
       ? {label: "Fewer like this?", title: "Hide alerts like this one: a channel, country, topic or phrase", fn: () => openTune(list[0])} : null;
@@ -1692,7 +1778,14 @@ function undoLast() {
   if (hadFocus) { const c = cardEl(ids[0]); if (c) c.focus({preventScroll: true}); }
   if (last.kind === "ack") { queued(() => unacknowledge(last)); return; }
   queued(async () => {
-    if (!await sendVerdicts(last.before, last.after)) { state.lastSave = last; return; }
+    if (!await sendVerdicts(last.before, last.after)) {
+      // The save failed: the cards that left come back in their places with the error, so it can be retried.
+      putBack(last); last.removed = [];
+      ids.forEach(id => refreshCard(id));
+      state.lastSave = last; return;
+    }
+    putBack(last);
+    if (hadFocus) { const c = cardEl(ids[0]); if (c) c.focus({preventScroll: true}); }
     const was = last.before.get(ids[0]);
     toast("Undone: " + (ids.length > 1 ? plural(ids.length, "alert") + " back as they were" : was.verdict === "unreviewed" ? "back in To review"
       : "back to " + verdictWords(was)) + ".", false);
@@ -2135,7 +2228,7 @@ function refreshCard(id) {
 }
 function siblingCard(id, dir) {
   let n = cardEl(id); if (!n) return null;
-  do { n = dir > 0 ? n.nextElementSibling : n.previousElementSibling; } while (n && !n.classList.contains("alert"));
+  do { n = dir > 0 ? n.nextElementSibling : n.previousElementSibling; } while (n && (!n.classList.contains("alert") || n.classList.contains("leaving")));
   return n;
 }
 // j / k: the next card takes the focus; while a card is open (reading), the next one opens instead.
@@ -2196,7 +2289,9 @@ function renderAlerts(panel, d) {
   // Later pages carry no total: the first page's stays.
   if (!state.cursor) state.alertsTotal = {total: d.total, capped: d.total_capped};
   const totals = state.alertsTotal || {total: d.total, capped: d.total_capped};
-  const summary = el("p", plural(totals.total, "alert") + (totals.capped ? "+" : "") + (active.length ? " · " + active.join(" · ") : ""), "meta");
+  alertsDraw++;
+  const summary = el("p", undefined, "meta");
+  summary.append(el("span", plural(totals.total, "alert") + (totals.capped ? "+" : ""), "alerts-count"), active.length ? " · " + active.join(" · ") : "");
   if (active.length) summary.append(" ", button("Clear filters", () => openAlerts({verdict: f.verdict}), {cls: "link"}));
   headMeta(panel, summary);
   panel.append(qf, alertFilters(f, items, rules));
