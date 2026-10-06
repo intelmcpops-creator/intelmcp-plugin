@@ -564,6 +564,26 @@ td.when { white-space: nowrap; }
 .welcome p { margin: 0; flex: 1; max-width: 70em; }
 .welcome[hidden] { display: none; }
 
+/* The Telegram view of an expanded alert: the post as Telegram shows it, its photos blurred until shown. */
+.tg-view { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s2) var(--s3); margin: var(--s1) 0; min-width: 0; }
+.tg-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s2); font: var(--fs-meta); color: var(--muted); }
+.tg-head strong { color: var(--fg); overflow-wrap: anywhere; }
+.tg-private { display: inline-flex; align-items: center; gap: 4px; }
+.tg-post .text { margin: var(--s1) 0; }
+.tg-photos { margin-top: var(--s2); display: grid; gap: var(--s1); justify-items: start; min-width: 0; }
+.tg-row { display: flex; flex-wrap: wrap; gap: var(--s1); max-width: 100%; }
+.tg-photo { display: block; overflow: hidden; border-radius: var(--r-lg); max-width: 100%; line-height: 0; background: var(--bg); }
+.tg-photo img { display: block; max-width: 100%; max-height: 260px; width: auto; height: auto; min-width: 96px; min-height: 96px; object-fit: contain; }
+.tg-photo img.blurred { filter: blur(18px); cursor: default; }
+.tg-photo img:not(.blurred) { cursor: zoom-in; }
+.tg-photo img:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tg-unavailable { display: inline-flex; align-items: center; justify-content: center; min-width: 96px; min-height: 96px; padding: var(--s2); text-align: center;
+  border: 1px dashed var(--line-strong); border-radius: var(--r-lg); color: var(--muted); font: var(--fs-meta); }
+.tg-overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: var(--s4);
+  background: rgba(0, 0, 0, .82); }
+.tg-overlay img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.tg-overlay button { position: absolute; top: var(--s2); inset-inline-end: var(--s2); }
+
 </style>
 <div id="app">
 <header class="top">
@@ -1119,10 +1139,13 @@ function parse(r) {
 // Reads: up to two at once. Writes: one at a time, and every control that writes is
 // disabled while one waits (the host may be asking for approval).
 let reading = 0; const readQueue = [];
-async function read(name, args) {
+// opts.raw: the CallToolResult itself (its image blocks), for the one tool whose answer is not JSON alone.
+async function read(name, args, opts) {
   while (reading >= 2) await new Promise(r => readQueue.push(r));
   reading++;
-  try { return parse(await request("tools/call", {name: name, arguments: args}, READ_TIMEOUT)); }
+  try { const r = await request("tools/call", {name: name, arguments: args}, READ_TIMEOUT);
+    if (opts && opts.raw) { parse(r.isError ? r : {content: [{type: "text", text: "{}"}]}); return r; }
+    return parse(r); }
   finally { reading--; const next = readQueue.shift(); if (next) next(); }
 }
 let writing = null;
@@ -1159,6 +1182,7 @@ const state = {tab: "overview", days: 7, cache: {}, openLinks: false, initialize
   known: new Map(),      // match_id -> alert, for the matches a card stands for and Undo
   channels: new Map(),   // channel_id -> title, from loaded alerts (for channel exclusions)
   expanded: null,        // the match_id of the card that is open (grown)
+  photos: new Map(), revealed: new Set(),   // post_images answers by message_ref; refs whose photos are shown unblurred
   messages: new Map(), msgErrors: new Map(), loadingRefs: new Set(),   // get_message answers by message_ref
   saving: new Set(),     // cards whose save waits for an answer
   cardErrors: new Map(), // match_id -> why its last save did not go through
@@ -1167,6 +1191,16 @@ const state = {tab: "overview", days: 7, cache: {}, openLinks: false, initialize
   plan: null,            // {name, monitor} from the first view; unknown counts as Monitor
   monitorLimits: null,   // what Monitor allows (show_dashboard's monitor_limits)
   chosen: false};        // the analyst picked a tab (a plan without Monitor otherwise opens on Search)
+// state.expanded has one setter: whatever opens, closes or moves between cards blurs the photos again
+// (a reveal is never remembered) and forgets photo answers that were errors or unavailable, so reopening retries.
+(function () {
+  let open = null;
+  Object.defineProperty(state, "expanded", {enumerable: true, get: () => open, set: v => {
+    if (v === open) return;
+    open = v; state.revealed.clear();
+    state.photos.forEach((p, ref) => { if (p.state === "error" || (p.slots && p.slots.some(x => x.data === null))) state.photos.delete(ref); });
+  }});
+})();
 
 function remember(items) {
   arr(items).forEach(a => { if (a && a.match_id) { state.known.set(a.match_id, a);
@@ -1868,6 +1902,96 @@ function postText(text, lang, term) {
     .forEach(p => { const pe = markedBlock("p", p, undefined, undefined, term); pe.dir = "auto"; delete pe.dataset.dom; box.append(pe); });
   return box;
 }
+// The post as Telegram shows it: who posted it and when, its text, where it was forwarded from, its photos.
+function telegramView(a, text, lang, msg) {
+  const view = el("div", undefined, "tg-view");
+  const head = el("div", undefined, "tg-head");
+  if (!a.match_id) { const title = el("strong", str(a.channel, 80) || "channel"); title.dir = "auto"; head.append(title); }   // an alert card's head has it
+  if (a.private === true) { const p = el("span", undefined, "tg-private"); p.append(icon("lock"), document.createTextNode(" Private channel")); head.append(p); }
+  else if (a.channel_username) head.append(el("span", "@" + str(a.channel_username, 32), "handle"));
+  const when = a.posted_at || a.time; if (when) head.append(el("span", fmtTime(when), "time"));
+  view.append(head);
+  if (text) { const post = el("div", undefined, "tg-post"); post.append(postText(text, lang, a.term)); view.append(post); }
+  if (msg && msg.forward_of) view.append(el("p", "Forwarded from " + str(msg.forward_of.name || msg.forward_of.channel_id || "another channel", 120)
+    + (msg.forward_of.date ? ", " + fmtTime(msg.forward_of.date) : ""), "meta tg-forward"));
+  const strip = photoStrip(a);
+  if (strip) view.append(strip);
+  return view;
+}
+// The photos of a post, blurred until the analyst shows them. One post_images call per post, made when the card opens.
+function photoStrip(a) {
+  const ref = str(a.message_ref);
+  if (a.images_expired === true && !(num(a.images) > 0)) return el("div", "Image expired (kept 90 days)", "tg-photos meta");
+  if (!(num(a.images) > 0) || !ref) return null;
+  const box = el("div", undefined, "tg-photos"); box.dataset.ref = ref;
+  let p = state.photos.get(ref);
+  if (!p) { p = {state: "loading"}; state.photos.set(ref, p); loadPhotos(a, p);
+    while (state.photos.size > 5) state.photos.delete(state.photos.keys().next().value); }   // the last 5 opened posts
+  if (p.state === "loading") { box.append(el("span", "Loading the photos…", "meta")); return box; }
+  if (p.state === "error") { box.append(el("span", "Image unavailable", "meta")); return box; }
+  const shown = state.revealed.has(ref);
+  const row = el("div", undefined, "tg-row"); box.append(row);
+  const imgs = [];
+  p.slots.forEach(slot => {
+    if (slot.data === null) { row.append(el("span", slot.expired ? "Image expired (kept 90 days)" : "Image unavailable", "tg-unavailable")); return; }
+    const wrap = el("span", undefined, "tg-photo"), img = document.createElement("img");
+    img.src = "data:image/jpeg;base64," + slot.data;
+    const who = "Photo from " + (str(a.channel, 60) || "the channel");
+    img.alt = shown ? who : who + ", blurred"; if (!shown) img.classList.add("blurred");
+    // A click shows a blurred photo and opens a shown one full-size; Enter and Space on a shown photo are a click.
+    img.addEventListener("click", ev => { ev.stopPropagation(); if (state.revealed.has(ref)) showFull(img); else setShown(true); });
+    img.addEventListener("keydown", ev => { if (ev.key === "Enter" && state.revealed.has(ref)) { ev.preventDefault(); ev.stopPropagation(); img.click(); }
+      else if (ev.key === " " && state.revealed.has(ref)) { ev.preventDefault(); ev.stopPropagation(); } });
+    img.addEventListener("keyup", ev => { if (ev.key === " " && state.revealed.has(ref)) { ev.preventDefault(); ev.stopPropagation(); img.click(); } });
+    if (shown) { img.tabIndex = 0; img.setAttribute("role", "button"); img.title = "Open the full-size photo"; }
+    wrap.append(img); row.append(wrap); imgs.push({img: img, who: who});
+  });
+  const setShown = on => {
+    if (on) state.revealed.add(ref); else state.revealed.delete(ref);
+    imgs.forEach(x => { x.img.classList.toggle("blurred", !on); x.img.alt = on ? x.who : x.who + ", blurred";
+      if (on) { x.img.tabIndex = 0; x.img.setAttribute("role", "button"); x.img.title = "Open the full-size photo"; }
+      else { x.img.removeAttribute("tabindex"); x.img.removeAttribute("role"); x.img.removeAttribute("title"); } });
+    const b = box.querySelector("button"); if (b) b.textContent = on ? "Hide image" : "Show image";
+  };
+  if (imgs.length) box.append(button(shown ? "Hide image" : "Show image", () => setShown(!state.revealed.has(ref))));
+  return box;
+}
+async function loadPhotos(a, p) {
+  const ref = str(a.message_ref);
+  try {
+    const r = await read("post_images", {message_ref: ref}, {raw: true});
+    const content = Array.isArray(r.content) ? r.content : [];
+    let meta = {};
+    const t = content.find(c => c && c.type === "text" && typeof c.text === "string");
+    if (t) { try { const d = JSON.parse(t.text); if (d && typeof d === "object") meta = d; } catch (e) { meta = {}; } }
+    // Only blocks of type image/jpeg are shown, in idx order; an entry that is expired or unavailable has no block.
+    const blocks = content.filter(c => c && c.type === "image" && c.mimeType === "image/jpeg" && typeof c.data === "string").map(c => c.data);
+    const entries = arr(meta.images);
+    let next = 0;
+    p.slots = entries.length ? entries.map(e => (e && !e.expired && !e.unavailable && next < blocks.length)
+      ? {data: blocks[next++]} : {data: null, expired: !!(e && e.expired)}) : blocks.map(d => ({data: d}));
+    if (!p.slots.length) throw new Error("none");
+    p.state = "ok";
+  } catch (err) { p.state = "error"; }
+  const boxes = document.querySelectorAll('.tg-photos[data-ref="' + CSS.escape(ref) + '"]');
+  boxes.forEach(box => { const fresh = photoStrip(a); if (fresh) box.replaceWith(fresh); });
+  if (p.state === "error" && !boxes.length && state.photos.get(ref) === p) state.photos.delete(ref);   // the card closed meanwhile: reopening retries
+  resize();
+}
+// The full-size photo: Esc or Close closes it and the focus goes back to the photo.
+function showFull(img) {
+  const ov = el("div", undefined, "tg-overlay"); ov.setAttribute("role", "dialog"); ov.setAttribute("aria-modal", "true"); ov.setAttribute("aria-label", "Photo");
+  const big = document.createElement("img"); big.src = img.src; big.alt = img.alt.replace(/, blurred$/, "");
+  const close = button("Close", () => done(), {icon: "x"});
+  const done = () => { document.removeEventListener("keydown", onKey, true); ov.remove(); if (img.isConnected) img.focus({preventScroll: true}); };
+  // Behind the photo the panel hears nothing: only Esc, Tab and the Close button's own keys act.
+  const onKey = ev => { if (ev.key === "Escape") { ev.preventDefault(); ev.stopImmediatePropagation(); done(); }
+    else if (ev.key === "Tab") { ev.preventDefault(); ev.stopImmediatePropagation(); close.focus(); }
+    else ev.stopImmediatePropagation(); };
+  document.addEventListener("keydown", onKey, true);
+  ov.addEventListener("click", ev => { ev.stopPropagation(); if (ev.target === ov) done(); });
+  ov.append(close, big); document.body.append(ov); close.focus();
+}
 // The grown part, from what the alert carries; an alert without its post reads it once (cached).
 function drawMore(more, a, opts) {
   const ref = str(a.message_ref); const msg = state.messages.get(ref) || null;
@@ -1875,13 +1999,12 @@ function drawMore(more, a, opts) {
   const main = el("div", undefined, "main"), side = el("div", undefined, "side"), foot = el("div", undefined, "foot");
   const text = msg && typeof msg.text === "string" ? msg.text : a.text;
   const lang = (msg && msg.lang) || a.lang;
-  if (text) main.append(postText(text, lang, a.term));
+  main.append(telegramView(a, text, lang, msg));
+  if (text) { /* shown in the Telegram view */ }
   else if (state.msgErrors.has(ref)) main.append(el("p", state.msgErrors.get(ref), "error"), button("Try again", () => loadMessage(a)));
   else main.append(el("p", "Loading the post…", "meta"));
   if (a.text_truncated && !(msg && msg.text)) main.append(el("p", "The post is longer than shown.", "meta"), button("Load the whole post", () => loadMessage(a)));
   if (msg) {
-    if (msg.forward_of) main.append(el("p", "Forwarded from " + str(msg.forward_of.name || msg.forward_of.channel_id || "another channel", 120)
-      + (msg.forward_of.date ? ", " + fmtTime(msg.forward_of.date) : ""), "meta"));
     arr(msg.media).forEach(m => main.append(el("p", "Attachment: " + [m.type, m.file_name, m.mime_type, m.size].filter(Boolean).map(x => str(x, 80)).join(", "), "meta")));
     arr(msg.previous_versions).forEach(v => { main.append(el("h3", "Version " + num(v.version) + " (replaced " + fmtTime(v.replaced_at) + ")"), textBlock("div", v.text, "text")); });
   } else if (text && ref) {
@@ -2787,9 +2910,9 @@ function searchResults(r, more) {
     if (typeof c.lang === "string" && LANGS.includes(c.lang) && c.lang !== "en") meta.append(lozenge(c.lang, "neutral"));
     meta.append(whenEl(c.posted_at));
     const act = el("div", undefined, "actions");
-    const found = {message_ref: c.message_ref, channel: ch.title, link: c.link, lang: c.lang, excerpt: c.excerpt, term: terms};
+    const found = {message_ref: c.message_ref, channel: ch.title, link: c.link, lang: c.lang, excerpt: c.excerpt, term: terms, posted_at: c.posted_at};
     card._alert = found; card._opts = {};
-    const toggle = () => { const open = card.querySelector(".more");
+    const toggle = () => { state.revealed.clear(); const open = card.querySelector(".more");
       if (open) { open.remove(); card.classList.remove("open"); tog.textContent = "Open"; tog.setAttribute("aria-expanded", "false"); resize(); return; }
       const m = el("div", undefined, "more"); card.append(m); card.classList.add("open"); drawMore(m, found, {});
       tog.textContent = "Close"; tog.setAttribute("aria-expanded", "true"); resize(); };
