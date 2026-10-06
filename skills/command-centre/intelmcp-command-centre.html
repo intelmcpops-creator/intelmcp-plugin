@@ -102,9 +102,6 @@ svg.ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor
 
 /* ---------------------------------------------------------------- header and tabs */
 .brand { display: inline-flex; gap: var(--s2); align-items: center; font: var(--fs-title); letter-spacing: .01em; }
-/* The organization's name: quiet, one line, whole on hover. */
-.org { color: var(--muted); font: var(--fs-meta); max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.org[hidden] { display: none; }
 .mark { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--fg); box-shadow: 0 0 0 3px var(--line-strong); }
 .days { display: inline-flex; align-items: center; gap: var(--s2); }
 .days[hidden] { display: none; }
@@ -555,7 +552,6 @@ td.when { white-space: nowrap; }
 .loz.new { color: var(--low); }
 /* Narrow: who and when on the first line, why on its own. */
 @media (max-width: 520px) {
-  .org { max-width: 14ch; }
   .alert-filters select { max-width: 100%; }
   .qf .keys { display: none; }   /* the keys are for a keyboard */
   .alert .head .why { flex-basis: 100%; }
@@ -572,7 +568,6 @@ td.when { white-space: nowrap; }
 <header class="top">
   <div class="bar">
     <strong class="brand"><span class="mark" aria-hidden="true"></span>IntelMCP</strong>
-    <span id="org" class="org" hidden></span>
     <span class="grow"></span>
     <span id="daysWrap" class="days"><label for="days">Window</label>
     <select id="days"><option value="7">7 days</option><option value="30">30 days</option></select></span>
@@ -593,8 +588,8 @@ td.when { white-space: nowrap; }
 <div id="content">
 <main id="panel" role="tabpanel" tabindex="-1"></main>
 <details class="help"><summary>About this panel</summary>
-<p>This page calls IntelMCP through your own IntelMCP connection, so it shows your organization's alerts, rules
-and settings, and the collection your plan includes. The first time, Claude asks whether the page may use IntelMCP.
+<p>This page calls IntelMCP through your own IntelMCP connection, so it shows your alerts, rules and
+settings, and the collection your plan includes. The first time, Claude asks whether the page may use IntelMCP.
 It changes or deletes something only when you press a button or key; deleting and rotating a secret ask you to confirm. A verdict, an acknowledgement or a hidden
 channel, country, topic or phrase is saved when you press it, in one call; Undo (or the z key) puts back the last
 verdict or acknowledgement. Hiding alerts asks you once more first. Webhook secrets are shown here once: copy them
@@ -631,8 +626,8 @@ const ARTIFACT_MESSAGES = {
   selection_required: "More than one IntelMCP connector is set up; choose one when Claude asks, then press Refresh.",
   not_in_manifest: "IntelMCP is not allowed for this page. Allow it from the page's Permissions menu, then press Refresh.",
   consent_required: "IntelMCP is not allowed for this page yet. Press Refresh and allow it when asked.",
-  blocked_by_policy: "Your organization's policy blocks this IntelMCP tool.",
-  approval_required: "Your organization requires approval for this IntelMCP tool, which pages cannot ask for yet.",
+  blocked_by_policy: "A Claude policy on this account blocks this IntelMCP tool.",
+  approval_required: "This IntelMCP tool needs an approval in Claude that pages cannot ask for yet.",
   server_unavailable: "IntelMCP did not answer in time. Press Refresh to try again.",
   user_changed: "Another account is now signed in to Claude. Reload this page to see that account's IntelMCP.",
   not_granted: "This page cannot reach your connectors here. Open it in Claude (claude.ai or the Claude app).",
@@ -679,10 +674,10 @@ function artifactHost(m) {
   const box = document.createElement("section");
   box.id = "welcome"; box.className = "welcome"; box.setAttribute("aria-label", "About this page"); box.hidden = seen;
   const text = document.createElement("p");
-  text.textContent = "This is your IntelMCP Command Centre: your organization's live alerts, rules and settings, " +
+  text.textContent = "This is your IntelMCP Command Centre: your live alerts, rules and settings, " +
     "through your own IntelMCP connection. The first time, Claude asks whether this page may use IntelMCP: allow it. " +
     "It can change or delete your rules, exclusions and webhooks when you press a button; deleting and rotating a secret " +
-    "ask you to confirm. Pin this page in Claude to keep it one click away. It is private to you; colleagues create their own.";
+    "ask you to confirm. Pin this page in Claude to keep it one click away. It is private to you.";
   const ok = document.createElement("button");
   ok.type = "button"; ok.textContent = "Got it";
   ok.addEventListener("click", () => { box.hidden = true; try { localStorage.setItem("intelmcp.welcome", "1"); } catch (e) { /* not kept */ } });
@@ -1193,15 +1188,9 @@ async function load(view, force) {
   accept(data, view);
   return data;
 }
-// The organization's name next to the brand (text only; the whole name on hover).
-function showOrganization(name) {
-  const o = $("org"); const t = typeof name === "string" ? str(name.trim(), 80) : "";
-  o.textContent = t; o.title = t; o.hidden = !t;
-}
 function accept(data, view) {
   state.cache[view] = data;
   learnPlan(data);
-  if (data && "organization" in data) showOrganization(data.organization);
   if (view === "alerts") remember(data.items);
   if (view === "overview") { remember(data.latest); updateTabCounts(); }
   state.updatedAt = new Date().toISOString(); freshness();
@@ -1263,7 +1252,7 @@ function learnPlan(data) {
   if (before !== hasMonitor()) paintTabs();
 }
 // What this plan has, in one line.
-function planLine() { return "This organization is on the " + planName() + " plan: search over collected posts, sources and channel requests, and the account view."; }
+function planLine() { return "Your account is on the " + planName() + " plan: search over collected posts, sources and channel requests, and the account view."; }
 // What Monitor adds, with its own numbers when show_dashboard gave them.
 function monitorAdds() {
   const l = state.monitorLimits; const n = (k, text) => l && l[k] ? fmtNum(l[k]) + " " + text : null;
@@ -1285,7 +1274,7 @@ function renderLocked(panel, view) {
   panel.append(emptyState(title, planLine(), {icon: "lock", actions: [
     button("Go to Search", () => { state.chosen = true; selectTab("search", true); }, {cls: "primary", icon: "search"}), siteLink("Plans and pricing")]}));
   const sec = el("section", undefined, "plan-adds"); sec.append(el("h3", "What the Monitor plan adds"), monitorAdds(),
-    el("p", "Questions about this organization's plan: " + SUPPORT_EMAIL + ".", "meta"));
+    el("p", "Questions about your plan: " + SUPPORT_EMAIL + ".", "meta"));
   panel.append(sec);
 }
 // Rules on a plan without Monitor: said in place, the pattern kept to copy; a second press closes it.
@@ -2821,7 +2810,7 @@ function searchResults(r, more) {
 function renderAccount(panel, d) {
   const a = d.account || {}; const sub = a.subscription || {}; const lim = a.limits || {}; const today = a.today || {};
   const counts = a.counts || {}; const req = a.channel_requests || {};
-  headMeta(panel, "Plan, usage and organization. Times in this panel are UTC.");
+  headMeta(panel, "Plan, usage and sign-in. Times in this panel are UTC.");
   const grid = el("div", undefined, "acct");
   const section = (title, cls) => { const sct = el("section", undefined, cls); sct.append(el("h3", title)); grid.append(sct); return sct; };
   const kv = rows => { const dl = el("dl", undefined, "kv"); rows.forEach(([k, v]) => { const dd = el("dd"); if (typeof v === "string") dd.textContent = v; else dd.append(v);
@@ -2842,7 +2831,7 @@ function renderAccount(panel, d) {
   m("Enabled deliveries", counts.deliveries, lim.deliveries);
   m("Channel requests this month", req.used, req.limit);
   usage.append(ms, el("p", "Searches today: " + fmtNum(today.searches) + (lim.searches_per_minute ? " (" + fmtNum(lim.searches_per_minute) + " a minute at most)" : "") + ".", "meta"));
-  section("Organization", "org").append(kv([["Organization", textBlock("span", str(a.organization, 120))], ["Signed in as", textBlock("span", str(a.signed_in_as, 120))],
+  section("Sign-in and history", "who").append(kv([["Signed in as", textBlock("span", str(a.signed_in_as, 120))],
     ["History searched", d.history_days ? plural(d.history_days, "day") : "all stored history"],
     ["Collection starts", d.collection_starts ? fmtDate(d.collection_starts) : "none stored"]]));
   panel.append(grid);

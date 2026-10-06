@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "Set up or tune IntelMCP monitoring: interview the analyst about what they need to watch, test alert rules against recent Telegram threat-intel history, and save the rules and watch profile once approved; with monitoring already in place, adjust the existing rules instead. Use on first use of IntelMCP or when the analyst wants to change what they monitor."
+description: "Set up or tune IntelMCP monitoring: interview the analyst about what they need to watch, test alert rules against recent Telegram threat-intel history, and save the rules and watch profile once approved; with monitoring already in place, adjust the existing rules instead. Use on first use of IntelMCP, when the analyst pastes their setup answers from intelmcp.io, or when they want to change what they monitor."
 ---
 
 If the IntelMCP tools are not available, the analyst has not signed in yet: tell them to sign in
@@ -11,16 +11,24 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
 
 1. Call list_rules and get_watch_profile first. If either returns a count above 0, the analyst already
    has monitoring: follow "Tuning" below instead of starting over.
-2. Ask these two questions together, in one short message, and nothing else:
-   - What should we watch for? Their organization (names, domains), a country or sector, specific
+2. If the analyst's message already holds their answers (a message from intelmcp.io's setup builder,
+   which says "don't ask me the setup questions again", with the lines Catch, Targets and Volume and
+   perhaps Kinds of leaks, Vendors and products, Access types, Industrial systems, Malware and tools,
+   Fraud, Threat actors and Sectors), do not ask the setup questions again. Ask only what its "Ask me
+   only" line names (their company's names and domains, the people to watch, or which other items to
+   add, the ones it calls "I'll name"), in one short message, or nothing when it has no such line. Then
+   draft from "Pasted answers" in step 3.
+   Otherwise ask these two questions together, in one short message, and nothing else:
+   - What should we watch for? Their company (names, domains), a country or sector, specific
      threat groups, or vulnerabilities in products they use. Any mix, in their own words.
    - Which regions? Any of North America, Europe, Asia, South America, ANZ, Middle East, Africa,
      or global.
-3. From the answers, draft a few focused rules (usually three to six), grouped by concept: 'entity'
-   for countries (country:<two-letter code>), CVEs and other indicators; 'word' for whole words,
-   including names in the scripts used in their regions; RE2 'regex' for variants and spellings.
+3. From the answers, draft a few focused rules (usually three to six; with pasted answers, one or two
+   per area), grouped by concept: 'entity' for countries (country:<two-letter code>), CVEs and other
+   indicators; 'word' for whole words, including names in the scripts used in their regions; RE2
+   'regex' for variants and spellings.
    Watch short tokens: a 2-5 letter name matches inside other words, so use 'word' or word boundaries.
-   - The organization's own domains: a 'word' rule on the domain (example.com) or an 'entity' rule
+   - Their company's own domains: a 'word' rule on the domain (example.com) or an 'entity' rule
      (domain:example.com); both catch subdomains (vpn.example.com) and email addresses
      (name@example.com) in leaks, and the entity rule also catches defanged forms (example[.]com).
    - A name that is also a common word: write the word rule as '=word' (=حماس). Arabic and Hebrew
@@ -30,25 +38,50 @@ Set up the analyst's IntelMCP monitoring quickly; they refine it as they review 
      country scoped with threat topic tags from list_topics, or the country's names combined with
      threat terms in a regex, plus rules for the threat groups they named.
    - If they mention industrial systems (SCADA, PLCs, an ICS vendor), add a rule for those terms.
+   Pasted answers: every answer becomes focused rules, with terms in the languages the actors post in.
+   "All" or "everything" asks for the broad version of an area, still within the volume.
+   - DDoS attacks, defacements, intrusion claims, destructive attacks: claim terms (down, hacked,
+     breached, wiped) combined with the targets, and 'entity' domain rules on the proof hosts such posts
+     link to (an uptime checker for DDoS, a defacement mirror).
+   - Data leaks, credentials, stealer logs, personal data: leak terms for the kinds they chose
+     (database, dump, combo list, logs), and the file-share and paste links leaks are posted with.
+   - Exploited vulnerabilities (CVEs): 'entity' cve rules for CVEs they name, and the vendors and
+     products they chose combined with exploit terms (CVE, exploit, PoC, 0day).
+   - Sales of hacked access: access terms (RDP, VPN, shell, panel, domain admin) with the vendors.
+   - Industrial systems: ICS terms (SCADA, PLC, HMI) and the ICS vendors and kinds of plant they chose.
+   - Ransomware victims: victim and leak-site terms (new victim, countdown, published) with the targets.
+   - Malware and tools, botnets, fraud, phishing, crypto scams, insider recruitment: the terms of the
+     kinds they chose.
+   - Conflict and influence operations: the campaigns' names and hashtags and the groups taking part.
+   - Their company, executives, impersonation: a domain 'entity' rule per domain and 'word' rules on
+     each name, in the scripts used in the target regions.
+   - Threat actors: the known active groups of each kind they chose, as 'word' rules with each name in
+     the scripts used in the target regions.
+   - Targets and sectors: scope the rules with the countries' names and sector terms (bank, ministry,
+     hospital), never a bare country rule; "all of" a region means the whole region, and "worldwide"
+     leaves the targets open.
 4. Run preview_rule on every draft (for a regex, pass search_hint). Drop or tighten a rule whose sample
    hits are mostly noise, and loosen one that catches nothing. matched_forms lists the spellings and
    prefixed forms a rule caught, with counts: a form that is another word calls for '=word' or a
    tighter pattern.
-   - Volume budget: add up alerts_per_day across the rules. Aim for roughly 10-30 a day in total.
-     Above about 50 a day the analyst cannot review them all: narrow the biggest rules first (scope a
-     country rule with threat topics, combine it with terms, or replace it with the named groups),
-     preview again, and in the summary say why they were narrowed.
+   - Volume budget: add up alerts_per_day across the rules. Aim for the volume the analyst chose:
+     about 5-10 a day for "only the important few", about 20-40 a day for "a steady feed", 50 or more a
+     day for "everything relevant"; without a choice, roughly 10-30 a day. Above about 50 a day the
+     analyst cannot review them all, unless they chose everything relevant: narrow the biggest rules
+     first (scope a country rule with threat topics, combine it with terms, or replace it with the named
+     groups), preview again, and in the summary say why they were narrowed.
    - If truncated is true, the scan stopped at its cap: the real volume is higher than hit_count
      shows. Narrow the rule, or for a regex add search_hint, and preview again.
    - Thin coverage: list_topics gives each topic's live_sources (sources that posted in the last 30
      days). If the topics for a chosen region have few live sources, or its rules' previews return few
      or no hits even with days=30, say plainly that IntelMCP's coverage of that region is thin, and offer
-     request_channel for public channels they know there.
+     request_channel for public channels they know there. The same holds for every area of pasted
+     answers (a target, sector, kind of attack or actor) whose previews stay thin.
 5. Write a short watch profile from the answers: a brief, what qualifies (criteria), and a severity
    guide where critical is what they described as most important.
 6. Show one compact summary: each rule in plain words with its expected alerts per day, the total per
-   day, and the profile. Ask one question: create all of it, including the last 7 days of history,
-   yes or no?
+   day (against the volume they chose, if they did), and the profile. Ask one question: create all of
+   it, including the last 7 days of history, yes or no?
 7. On yes: add_rule for each rule with backfill_days=7, then save_watch_profile with the name
    "default". Then show the first results:
    - how many matches the last 7 days produced for each rule (backfilled in each add_rule result);
@@ -74,6 +107,7 @@ a. Show what exists: each rule in plain words with its hit_count (matches so far
 a2. If there is no watch profile, write one as in step 5 from the existing rules and the analyst's
    answer, and save it with save_watch_profile under the name 'default'.
 b. Ask one question: what should change (less noise, more of something, a new topic, a new focus)?
+   Pasted answers already say it: draft from them instead of asking.
 c. Propose changes to what exists, with preview_rule on every new or changed pattern: update_rule to
    narrow or widen a rule, set_rule_enabled to pause one, delete_rule to remove one, exclude to hide
    a noisy topic, country, channel or phrase across all rules, add_rule only for a topic no rule covers; save_watch_profile under the existing profile's name to adjust it.
