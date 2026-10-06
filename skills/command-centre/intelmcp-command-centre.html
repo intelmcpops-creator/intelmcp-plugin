@@ -2000,9 +2000,8 @@ function drawMore(more, a, opts) {
   const text = msg && typeof msg.text === "string" ? msg.text : a.text;
   const lang = (msg && msg.lang) || a.lang;
   main.append(telegramView(a, text, lang, msg));
-  if (text) { /* shown in the Telegram view */ }
-  else if (state.msgErrors.has(ref)) main.append(el("p", state.msgErrors.get(ref), "error"), button("Try again", () => loadMessage(a)));
-  else main.append(el("p", "Loading the post…", "meta"));
+  if (!text && state.msgErrors.has(ref)) main.append(el("p", state.msgErrors.get(ref), "error"), button("Try again", () => loadMessage(a)));
+  else if (!text) main.append(el("p", "Loading the post…", "meta"));
   if (a.text_truncated && !(msg && msg.text)) main.append(el("p", "The post is longer than shown.", "meta"), button("Load the whole post", () => loadMessage(a)));
   if (msg) {
     arr(msg.media).forEach(m => main.append(el("p", "Attachment: " + [m.type, m.file_name, m.mime_type, m.size].filter(Boolean).map(x => str(x, 80)).join(", "), "meta")));
