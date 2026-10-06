@@ -345,6 +345,7 @@ kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line-st
 .head { row-gap: 2px; font: var(--fs-meta); }
 .head button.link { font-weight: 600; color: var(--fg); text-decoration-color: var(--line-strong); }
 .handle { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.private-src { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
 .head .time { font-variant-numeric: tabular-nums; }
 .why .term { color: var(--fg); font-weight: 600; }
 .summary { font-weight: 600; margin: 6px 0 0; overflow-wrap: anywhere; }
@@ -1004,6 +1005,9 @@ function link(url, label, withIcon) {
   a.addEventListener("click", ev => { if (state.openLinks) { ev.preventDefault(); request("ui/open-link", {url: url}, READ_TIMEOUT).catch(() => {}); } });
   return a;
 }
+// A private source: customers are not members, so there is no post link; the label says why.
+function privateLabel() { const s = el("span", undefined, "private-src"); s.append(icon("lock"), document.createTextNode(" Private channel")); return s; }
+function isPost(url) { return typeof url === "string" && TME.test(url); }
 // The one link that is not a post: the pricing page, a fixed address.
 function siteLink(label) {
   const a = el("a", label, "site"); a.append(icon("external"));
@@ -1721,6 +1725,7 @@ function alertCard(a, opts) {
   chan.dir = "auto";
   head.append(sevBadge(a.severity, a.verdict), chan);
   if (a.channel_username) head.append(el("span", "@" + str(a.channel_username, 32), "handle"));
+  if (a.private === true && !isPost(a.link)) head.append(privateLabel());
   if (isNew(a)) head.append(newMark());
   head.append(whenEl(a.posted_at, a.time));
   const why = el("span", undefined, "why");
@@ -1894,7 +1899,7 @@ function drawMore(more, a, opts) {
   if (mentioned.length) side.append(el("p", "Countries mentioned: " + mentioned.map(c => countryName(str(c))).join(", "), "meta"));
   const also = arr(a.also_reported_by);
   if (also.length) { side.append(el("h3", "Also reported by")); const ul = el("ul");
-    also.forEach(x => { const li = el("li"); li.append(textBlock("span", str(x.channel, 120) + " "), link(x.link, "open post")); ul.append(li); });
+    also.forEach(x => { const li = el("li"); li.append(textBlock("span", str(x.channel, 120) + " ")); if (isPost(x.link)) li.append(link(x.link, "open post")); ul.append(li); });
     side.append(ul); }
   if (ref) {
     const around = el("details", undefined, "around"); around.append(el("summary", "Surrounding posts and replies"));
@@ -2241,7 +2246,7 @@ function traceView(t) {
   if (spread.length) { box.append(el("h3", "Spread by " + plural(spread.length, "channel"))); const ul = el("ul");
     spread.forEach(s => { const li = el("li"); const ch = s.channel && typeof s.channel === "object"
       ? (s.channel.title || (s.channel.username ? "@" + s.channel.username : "a channel")) : (s.channel || "a channel");
-      li.append(document.createTextNode(str(ch, 120) + " "), timeEl(s.posted_at), document.createTextNode(" "), link(s.link, "open post")); ul.append(li); });
+      li.append(document.createTextNode(str(ch, 120) + " "), timeEl(s.posted_at), document.createTextNode(" ")); if (isPost(s.link)) li.append(link(s.link, "open post")); ul.append(li); });
     box.append(ul); }
   if (!box.children.length) box.append(el("p", "No forwards or copies found.", "meta"));
   return box;
@@ -2651,6 +2656,7 @@ function renderSources(panel, d) {
   const strip = el("div", undefined, "summary-strip");
   const mini = (n, label) => { const m = el("div", undefined, "mini"); m.append(el("b", n), el("span", label)); strip.append(m); };
   mini(fmtNum(d.live_sources), "live sources"); mini(fmtNum(d.silent_sources), "silent sources");
+  if (num(d.private_sources) > 0) mini(fmtNum(d.private_sources), "private sources");
   if (d.history_from) mini(fmtDate(d.history_from), "stored history from");
   panel.append(strip);
   const topics = arr(d.topics);
@@ -2796,6 +2802,7 @@ function searchResults(r, more) {
     if (!hasMonitor()) make.setAttribute("aria-expanded", "false");
     act.append(tog, make);
     const tg = link(c.link, "Telegram"); if (tg.tagName === "A") act.append(tg);
+    else if (c.private === true) act.append(privateLabel());
     card.append(meta, markedBlock("div", str(c.excerpt || c.text, 600), "excerpt", c.lang, terms), act);
     card.addEventListener("click", ev => { const t = ev.target;
       if (!t || !t.closest || t.closest("button, a, input, select, textarea, summary, label, details, .more, .plan-note")) return;

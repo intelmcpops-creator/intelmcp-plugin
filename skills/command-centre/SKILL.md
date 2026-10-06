@@ -15,7 +15,7 @@ and settings, and the collection their plan includes.
    capabilities.json (the connector access it declares). Make a new temporary directory (for example with
    mktemp -d) and copy both there; never copy them into the analyst's project.
 3. Check both files against the checksums IntelMCP publishes for this plugin version, from inside that
-   temporary directory: download https://intelmcp.io/command-centre/checksums/0.4.0.sha256 as
+   temporary directory: download https://intelmcp.io/command-centre/checksums/0.5.0.sha256 as
    expected.sha256 (for example with curl -fsSL), then run shasum -a 256 -c expected.sha256 (or
    sha256sum -c expected.sha256; on Windows, compare PowerShell's Get-FileHash -Algorithm SHA256 with the
    file). Both files must check OK. If the download or the check fails, publish nothing: tell the analyst
