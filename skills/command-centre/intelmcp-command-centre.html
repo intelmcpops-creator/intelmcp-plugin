@@ -2652,7 +2652,7 @@ function secretBox() {
 
 // ------------------------------------------------------------------ sources
 function renderSources(panel, d) {
-  headMeta(panel, "The public channels IntelMCP collects, by topic.");
+  headMeta(panel, "The channels IntelMCP collects, by topic.");
   const strip = el("div", undefined, "summary-strip");
   const mini = (n, label) => { const m = el("div", undefined, "mini"); m.append(el("b", n), el("span", label)); strip.append(m); };
   mini(fmtNum(d.live_sources), "live sources"); mini(fmtNum(d.silent_sources), "silent sources");

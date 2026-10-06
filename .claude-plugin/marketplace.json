@@ -7,7 +7,7 @@
     {
       "name": "intelmcp",
       "displayName": "IntelMCP",
-      "description": "Threat intelligence from public Telegram channels inside Claude, with a setup interview, a dashboard, match triage, investigations and your own Command Centre page.",
+      "description": "Threat intelligence from Telegram (public channels, and private channels and groups the operator has reviewed) inside Claude, with a setup interview, a dashboard, match triage, investigations and your own Command Centre page.",
       "author": {"name": "IntelMCP", "url": "https://intelmcp.io"},
       "category": "security",
       "source": "./"

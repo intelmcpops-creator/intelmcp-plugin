@@ -1,7 +1,8 @@
 # IntelMCP for Claude Code and Cowork
 
 IntelMCP gives security analysts searchable, monitored threat intelligence from
-public Telegram channels, inside Claude. This plugin adds the IntelMCP connector
+Telegram (public channels, and private channels and groups the operator has reviewed),
+inside Claude. This plugin adds the IntelMCP connector
 and five commands:
 
 - **Set up monitoring**, `/intelmcp:setup`: Claude asks what you need to watch
